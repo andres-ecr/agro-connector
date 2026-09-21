@@ -44,8 +44,10 @@ if (!gotTheLock) {
  */
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 860,
+    height: 680,
+    minWidth: 680,
+    minHeight: 520,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -58,7 +60,7 @@ function createMainWindow() {
     minimizable: true,
     maximizable: true,
     closable: true,
-    title: 'Weight Capture Service',
+    title: 'Conector de Balanza - Sobifruits',
   });
 
   // Make main window globally accessible
@@ -94,7 +96,7 @@ function createMainWindow() {
  * Create system tray
  */
 function createTray() {
-  const iconPath = path.join(__dirname, 'assets/tray-icon.png');
+  const iconPath = path.join(__dirname, 'assets/logo.ico');
 
   try {
     const icon = nativeImage.createFromPath(iconPath);
@@ -102,7 +104,7 @@ function createTray() {
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'Show Weight Capture Service',
+        label: 'Mostrar Conector de Balanza',
         click: () => {
           if (mainWindow) {
             mainWindow.show();
@@ -112,22 +114,22 @@ function createTray() {
       },
       { type: 'separator' },
       {
-        label: 'Serial Status',
+        label: 'Estado Balanza',
         enabled: false,
         sublabel: serialManager
           ? serialManager.isConnected
-            ? 'Connected'
-            : 'Disconnected'
-          : 'Not initialized',
+            ? 'Conectada'
+            : 'Desconectada'
+          : 'No inicializado',
       },
       {
-        label: 'HTTP Server Status',
+        label: 'Servicio Web HTTP',
         enabled: false,
-        sublabel: httpWeightServer ? 'Running on :8080' : 'Not initialized',
+        sublabel: httpWeightServer ? 'Activo en :8080' : 'Detenido',
       },
       { type: 'separator' },
       {
-        label: 'Quit',
+        label: 'Cerrar Conector',
         click: () => {
           app.isQuiting = true;
           app.quit();
@@ -136,7 +138,7 @@ function createTray() {
     ]);
 
     tray.setContextMenu(contextMenu);
-    tray.setToolTip('Weight Capture Service');
+    tray.setToolTip('Conector de Balanza - Sobifruits');
 
     // Double click to show window
     tray.on('double-click', () => {

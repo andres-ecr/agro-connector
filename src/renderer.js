@@ -1,5 +1,6 @@
 /**
- * Renderer script for Weight Capture Service UI
+ * Renderer script for Weight Capture Service UI - Sobifruits
+ * Supports Operator (User) Mode and PIN-Protected Technical Support Mode
  */
 
 const { ipcRenderer } = require('electron');
@@ -7,15 +8,24 @@ const { ipcRenderer } = require('electron');
 // Global state
 let currentWeight = 0;
 let serialConnected = false;
-let connectedClients = [];
+let currentPortPath = null;
+let currentMode = 'operator'; // 'operator' | 'support'
 let logEntries = [];
 
-// DOM elements
-let weightValueEl, weightMetaEl, serialStatusEl, httpServerStatusEl;
+// DOM Elements
+let weightValueEl, weightMetaEl;
+let serialStatusEl, serialStatusTextEl;
+let httpServerStatusEl, httpStatusTextEl;
+let serialPortSelect, refreshPortsBtn, connectBtn, disconnectBtn;
 let testWeightInput, sendTestWeightBtn;
-let serialPortSelect, connectBtn, disconnectBtn, refreshPortsBtn;
-let clientCountEl, clientsListEl, activityLogEl, clearLogBtn;
-let httpServerInfoEl;
+let clientCountEl, clientsListEl, httpServerInfoEl;
+let activityLogEl, clearLogBtn;
+
+// Mode & PIN Elements
+let modeToggleBtn, modeToggleText;
+let viewOperator, viewSupport, exitSupportBtn;
+let pinModal, pinInput, pinError, pinCancelBtn;
+let newPinInput, confirmPinInput, savePinBtn, pinUpdateMsg;
 
 /**
  * Initialize the application
@@ -23,6 +33,7 @@ let httpServerInfoEl;
 document.addEventListener('DOMContentLoaded', async () => {
   initializeElements();
   setupEventListeners();
+  setupTabNavigation();
   await initializeData();
   startPeriodicUpdates();
 });
@@ -31,80 +42,127 @@ document.addEventListener('DOMContentLoaded', async () => {
  * Initialize DOM element references
  */
 function initializeElements() {
+  // Hero Weight
   weightValueEl = document.getElementById('weightValue');
   weightMetaEl = document.getElementById('weightMeta');
+
+  // Status badges
   serialStatusEl = document.getElementById('serialStatus');
+  serialStatusTextEl = document.getElementById('serialStatusText');
   httpServerStatusEl = document.getElementById('httpServerStatus');
+  httpStatusTextEl = document.getElementById('httpStatusText');
+
+  // Connection controls
   serialPortSelect = document.getElementById('serialPort');
+  refreshPortsBtn = document.getElementById('refreshPortsBtn');
   connectBtn = document.getElementById('connectBtn');
   disconnectBtn = document.getElementById('disconnectBtn');
-  refreshPortsBtn = document.getElementById('refreshPortsBtn');
-  clientCountEl = document.getElementById('clientCount');
-  clientsListEl = document.getElementById('clientsList');
-  activityLogEl = document.getElementById('activityLog');
-  clearLogBtn = document.getElementById('clearLogBtn');
-  httpServerInfoEl = document.getElementById('httpServerInfo');
 
-  // Test elements
+  // Support / Diagnostic elements
   testWeightInput = document.getElementById('testWeight');
   sendTestWeightBtn = document.getElementById('sendTestWeight');
+  clientCountEl = document.getElementById('clientCount');
+  clientsListEl = document.getElementById('clientsList');
+  httpServerInfoEl = document.getElementById('httpServerInfo');
+  activityLogEl = document.getElementById('activityLog');
+  clearLogBtn = document.getElementById('clearLogBtn');
+
+  // Mode switching & PIN modal
+  modeToggleBtn = document.getElementById('modeToggleBtn');
+  modeToggleText = document.getElementById('modeToggleText');
+  viewOperator = document.getElementById('viewOperator');
+  viewSupport = document.getElementById('viewSupport');
+  exitSupportBtn = document.getElementById('exitSupportBtn');
+
+  pinModal = document.getElementById('pinModal');
+  pinInput = document.getElementById('pinInput');
+  pinError = document.getElementById('pinError');
+  pinCancelBtn = document.getElementById('pinCancelBtn');
+
+  newPinInput = document.getElementById('newPinInput');
+  confirmPinInput = document.getElementById('confirmPinInput');
+  savePinBtn = document.getElementById('savePinBtn');
+  pinUpdateMsg = document.getElementById('pinUpdateMsg');
 }
 
 /**
  * Setup event listeners
  */
 function setupEventListeners() {
-  // Test weight events
-  if (sendTestWeightBtn) {
-    // Ensure the button is always enabled for manual testing
-    sendTestWeightBtn.disabled = false;
-
-    sendTestWeightBtn.addEventListener('click', async () => {
-      const weight = parseFloat(testWeightInput.value);
-      if (isNaN(weight) || weight <= 0) {
-        addLogEntry('error', 'Por favor ingrese un peso válido mayor a 0');
-        return;
-      }
-
-      try {
-        // Temporarily disable button to prevent double-clicks
-        sendTestWeightBtn.disabled = true;
-
-        await ipcRenderer.invoke('simulate-weight', weight);
-        addLogEntry(
-          'success',
-          `Peso de prueba enviado: ${weight.toFixed(1)} kg para truck-1`
-        );
-
-        // Clear the input after successful send
-        testWeightInput.value = '';
-      } catch (error) {
-        addLogEntry(
-          'error',
-          `Error al enviar peso de prueba: ${error.message}`
-        );
-      } finally {
-        // Re-enable button after operation
-        setTimeout(() => {
-          sendTestWeightBtn.disabled = false;
-        }, 500);
-      }
-    });
-  }
-
-  // Serial port events
-  serialPortSelect.addEventListener('change', () => {
-    connectBtn.disabled = !serialPortSelect.value;
+  // Mode toggle (Header button)
+  modeToggleBtn.addEventListener('click', () => {
+    if (currentMode === 'operator') {
+      openPinModal();
+    } else {
+      switchToOperatorMode();
+    }
   });
 
+  // Exit Support Mode button
+  exitSupportBtn.addEventListener('click', () => {
+    switchToOperatorMode();
+  });
+
+  // PIN modal cancel
+  pinCancelBtn.addEventListener('click', () => {
+    closePinModal();
+  });
+
+  // Close modal when clicking outside
+  pinModal.addEventListener('click', (e) => {
+    if (e.target === pinModal) {
+      closePinModal();
+    }
+  });
+
+  // Port selector change
+  serialPortSelect.addEventListener('change', () => {
+    const hasPort = Boolean(serialPortSelect.value);
+    connectBtn.disabled = !hasPort || serialConnected;
+    if (hasPort) {
+      localStorage.setItem('sobifruits_saved_port', serialPortSelect.value);
+    }
+  });
+
+  // Connection buttons
   connectBtn.addEventListener('click', connectToSerial);
   disconnectBtn.addEventListener('click', disconnectFromSerial);
   refreshPortsBtn.addEventListener('click', refreshSerialPorts);
 
-  // Log events
-  clearLogBtn.addEventListener('click', clearLog);
+  // Test weight emit
+  if (sendTestWeightBtn) {
+    sendTestWeightBtn.addEventListener('click', async () => {
+      const weight = parseFloat(testWeightInput.value);
+      if (isNaN(weight) || weight < 0) {
+        addLogEntry('error', 'Por favor ingrese un valor de peso válido.');
+        return;
+      }
 
-  // IPC events from main process
+      try {
+        sendTestWeightBtn.disabled = true;
+        await ipcRenderer.invoke('simulate-weight', weight);
+        addLogEntry('success', `Simulación emitida: ${weight.toFixed(1)} kg`);
+      } catch (err) {
+        addLogEntry('error', `Error al emitir peso simulado: ${err.message}`);
+      } finally {
+        setTimeout(() => {
+          sendTestWeightBtn.disabled = false;
+        }, 300);
+      }
+    });
+  }
+
+  // Clear log
+  if (clearLogBtn) {
+    clearLogBtn.addEventListener('click', clearLog);
+  }
+
+  // Save new PIN
+  if (savePinBtn) {
+    savePinBtn.addEventListener('click', handleSaveNewPin);
+  }
+
+  // IPC Events from Electron Main Process
   ipcRenderer.on('weight-update', (event, data) => {
     updateWeight(data);
   });
@@ -114,337 +172,366 @@ function setupEventListeners() {
   });
 
   ipcRenderer.on('serial-error', (event, error) => {
-    addLogEntry('error', `Serial Error: ${error}`);
+    addLogEntry('error', `Error Serial: ${error}`);
   });
 
   ipcRenderer.on('client-connected', (event, clientInfo) => {
-    addLogEntry(
-      'success',
-      `Web client connected: ${clientInfo.id} from ${clientInfo.ip}`
-    );
-    updateClients();
+    addLogEntry('success', `Cliente web conectado desde ${clientInfo.ip || 'localhost'}`);
+    updateClientsCount();
   });
 
   ipcRenderer.on('client-disconnected', (event, clientInfo) => {
-    addLogEntry('info', `Web client disconnected: ${clientInfo.id}`);
-    updateClients();
+    addLogEntry('info', `Cliente web desconectado: ${clientInfo.id}`);
+    updateClientsCount();
   });
 }
 
 /**
- * Initialize data from main process
+ * Tab Navigation in Support View
+ */
+function setupTabNavigation() {
+  const tabs = document.querySelectorAll('.tab-btn');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+
+      // Update active tab button
+      tabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // Update active content
+      document.querySelectorAll('.tab-content').forEach((content) => {
+        content.classList.remove('active');
+      });
+      const activeContent = document.getElementById(`tabContent-${target}`);
+      if (activeContent) {
+        activeContent.classList.add('active');
+      }
+    });
+  });
+}
+
+/**
+ * PIN Verification & Mode Switching
+ */
+function openPinModal() {
+  pinInput.value = '';
+  pinError.textContent = '';
+  pinModal.classList.add('open');
+  setTimeout(() => pinInput.focus(), 50);
+}
+
+function closePinModal() {
+  pinModal.classList.remove('open');
+  pinInput.value = '';
+  pinError.textContent = '';
+}
+
+window.handlePinSubmit = function () {
+  const enteredPin = pinInput.value.trim();
+  const savedPin = localStorage.getItem('sobifruits_support_pin') || '1234';
+
+  if (enteredPin === savedPin) {
+    closePinModal();
+    switchToSupportMode();
+    addLogEntry('info', 'Acceso técnico concedido.');
+  } else {
+    pinError.textContent = 'PIN incorrecto. Ingrese el código de soporte.';
+    pinInput.select();
+  }
+};
+
+function switchToSupportMode() {
+  currentMode = 'support';
+  viewOperator.classList.remove('active');
+  viewSupport.classList.add('active');
+  modeToggleText.textContent = 'Modo Operador';
+}
+
+function switchToOperatorMode() {
+  currentMode = 'operator';
+  viewSupport.classList.remove('active');
+  viewOperator.classList.add('active');
+  modeToggleText.textContent = 'Soporte Técnico';
+}
+
+function handleSaveNewPin() {
+  const p1 = newPinInput.value.trim();
+  const p2 = confirmPinInput.value.trim();
+
+  if (!p1 || p1.length < 4) {
+    pinUpdateMsg.style.color = 'var(--danger-dot)';
+    pinUpdateMsg.textContent = 'El PIN debe tener al menos 4 dígitos.';
+    return;
+  }
+
+  if (p1 !== p2) {
+    pinUpdateMsg.style.color = 'var(--danger-dot)';
+    pinUpdateMsg.textContent = 'Los PIN no coinciden.';
+    return;
+  }
+
+  localStorage.setItem('sobifruits_support_pin', p1);
+  pinUpdateMsg.style.color = 'var(--success-text)';
+  pinUpdateMsg.textContent = '✓ PIN actualizado con éxito.';
+  newPinInput.value = '';
+  confirmPinInput.value = '';
+  setTimeout(() => {
+    pinUpdateMsg.textContent = '';
+  }, 3000);
+}
+
+/**
+ * Test weight preset helper
+ */
+window.setPresetWeight = function (val) {
+  if (testWeightInput) {
+    testWeightInput.value = val.toFixed(1);
+    if (sendTestWeightBtn) {
+      sendTestWeightBtn.click();
+    }
+  }
+};
+
+/**
+ * Initialize data from Main process
  */
 async function initializeData() {
   try {
-    // Get app status
     const status = await ipcRenderer.invoke('get-app-status');
     updateAppStatus(status);
 
-    // Get HTTP Server info
     const httpInfo = await ipcRenderer.invoke('get-http-server-info');
     updateHttpServerInfo(httpInfo);
 
-    // Refresh serial ports
     await refreshSerialPorts();
 
-    // Ensure test weight button is always enabled for manual testing
-    if (sendTestWeightBtn) {
-      sendTestWeightBtn.disabled = false;
+    // Auto-select saved port if available
+    const savedPort = localStorage.getItem('sobifruits_saved_port');
+    if (savedPort && serialPortSelect) {
+      const match = Array.from(serialPortSelect.options).find((opt) => opt.value === savedPort);
+      if (match) {
+        serialPortSelect.value = savedPort;
+        connectBtn.disabled = serialConnected;
+      }
     }
 
-    addLogEntry('success', 'Weight Capture Service initialized');
+    addLogEntry('success', 'Conector de balanza inicializado correctamente.');
   } catch (error) {
-    addLogEntry('error', `Initialization error: ${error.message}`);
+    addLogEntry('error', `Error de inicio: ${error.message}`);
   }
 }
 
 /**
- * Start periodic updates
+ * Periodic status refresh
  */
 function startPeriodicUpdates() {
-  // Update app status every 5 seconds
   setInterval(async () => {
     try {
       const status = await ipcRenderer.invoke('get-app-status');
       updateAppStatus(status);
-    } catch (error) {
-      console.error('Error updating status:', error);
+    } catch (e) {
+      // ignore
     }
   }, 5000);
 }
 
 /**
- * Update weight display
+ * Update weight reading
  */
 function updateWeight(data) {
   currentWeight = data.value;
+  weightValueEl.textContent = Number(data.value).toFixed(1);
 
-  weightValueEl.textContent = `${data.value.toFixed(1)} kg`;
-
-  const timestamp = new Date(data.timestamp).toLocaleTimeString();
-  weightMetaEl.textContent = `Last update: ${timestamp} | Port: ${
-    data.port || 'N/A'
-  }`;
-
-  addLogEntry('info', `Weight: ${data.value.toFixed(1)} kg`);
+  const timestamp = new Date(data.timestamp || Date.now()).toLocaleTimeString();
+  const portLabel = data.port || currentPortPath || 'Activo';
+  weightMetaEl.innerHTML = `
+    <span>Última lectura: <strong>${timestamp}</strong></span>
+    <span>•</span>
+    <span>Puerto: <strong>${portLabel}</strong></span>
+    <span>•</span>
+    <span style="color: var(--success-text); font-weight: 600;">En Vivo</span>
+  `;
 }
 
 /**
- * Update serial connection status
+ * Update serial status
  */
 function updateSerialStatus(status) {
   serialConnected = status.connected;
+  currentPortPath = status.port || null;
 
   if (serialConnected) {
-    serialStatusEl.className = 'status-indicator connected';
-    serialStatusEl.innerHTML = `
-            <div class="status-dot"></div>
-            <span>Serial: Connected (${status.port})</span>
-        `;
-    connectBtn.disabled = true;
+    serialStatusEl.className = 'status-pill connected';
+    serialStatusTextEl.textContent = `Balanza: Conectada (${status.port || ''})`;
+    connectBtn.style.display = 'none';
+    disconnectBtn.style.display = 'inline-flex';
     disconnectBtn.disabled = false;
-    addLogEntry('success', `Serial connected to ${status.port}`);
   } else {
-    serialStatusEl.className = 'status-indicator disconnected';
-    serialStatusEl.innerHTML = `
-            <div class="status-dot"></div>
-            <span>Serial: Disconnected</span>
-        `;
+    serialStatusEl.className = 'status-pill disconnected';
+    serialStatusTextEl.textContent = 'Balanza: Desconectada';
+    disconnectBtn.style.display = 'none';
+    connectBtn.style.display = 'inline-flex';
     connectBtn.disabled = !serialPortSelect.value;
-    disconnectBtn.disabled = true;
-    if (status.port) {
-      addLogEntry('warning', 'Serial disconnected');
-    }
+    weightMetaEl.textContent = 'Balanza desconectada. Seleccione un puerto COM y conecte.';
   }
 }
 
 /**
- * Update app status
+ * Update overall app status
  */
 function updateAppStatus(status) {
-  // Update serial status
   if (status.serial) {
     updateSerialStatus(status.serial);
   }
 
-  // Update HTTP Server status
   if (status.httpServer) {
-    const serverConnected = status.httpServer.running;
-    clientCountEl.textContent = status.httpServer.activeConnections || 0;
-
-    if (serverConnected) {
-      httpServerStatusEl.className = 'status-indicator connected';
-      httpServerStatusEl.innerHTML = `
-                <div class="status-dot"></div>
-                <span>HTTP Server: Active (Port ${status.httpServer.port})</span>
-            `;
+    const isRunning = status.httpServer.running;
+    if (isRunning) {
+      httpServerStatusEl.className = 'status-pill connected';
+      httpStatusTextEl.textContent = `Servicio Web :${status.httpServer.port || 8080}`;
     } else {
-      httpServerStatusEl.className = 'status-indicator disconnected';
-      httpServerStatusEl.innerHTML = `
-                <div class="status-dot"></div>
-                <span>HTTP Server: Stopped</span>
-            `;
+      httpServerStatusEl.className = 'status-pill disconnected';
+      httpStatusTextEl.textContent = 'Servicio Web: Detenido';
     }
   }
 }
 
-/**
- * Update HTTP Server info
- */
 function updateHttpServerInfo(httpInfo) {
-  httpServerInfoEl.textContent = httpInfo.url || 'http://localhost:8080';
-  clientCountEl.textContent = httpInfo.activeConnections || 0;
+  if (httpServerInfoEl) {
+    httpServerInfoEl.textContent = httpInfo.url || 'http://localhost:8080';
+  }
 }
 
-/**
- * Update clients list
- */
-async function updateClients() {
+async function updateClientsCount() {
   try {
     const status = await ipcRenderer.invoke('get-app-status');
-    // This would need to be implemented in main.js to return client details
-    // For now, just update the count
-    if (status.httpServer) {
-      clientCountEl.textContent = status.httpServer.activeConnections || 0;
+    if (status.httpServer && clientCountEl) {
+      clientCountEl.textContent = status.httpServer.activeConnections || 1;
     }
-  } catch (error) {
-    console.error('Error updating clients:', error);
+  } catch (e) {
+    // ignore
   }
 }
 
 /**
- * Connect to serial port
+ * Serial connection actions
  */
 async function connectToSerial() {
   const selectedPort = serialPortSelect.value;
   if (!selectedPort) return;
 
   connectBtn.disabled = true;
-  connectBtn.textContent = 'Connecting...';
+  connectBtn.innerHTML = `<span>Conectando...</span>`;
 
   try {
-    const result = await ipcRenderer.invoke(
-      'connect-serial-port',
-      selectedPort
-    );
-
+    const result = await ipcRenderer.invoke('connect-serial-port', selectedPort);
     if (result.success) {
-      addLogEntry('success', `Connected to ${selectedPort}`);
+      addLogEntry('success', `Conectado exitosamente al puerto ${selectedPort}`);
     } else {
-      addLogEntry('error', `Failed to connect: ${result.error}`);
+      addLogEntry('error', `Fallo de conexión: ${result.error}`);
       connectBtn.disabled = false;
-      connectBtn.textContent = 'Connect';
+      connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
     }
-  } catch (error) {
-    addLogEntry('error', `Connection error: ${error.message}`);
+  } catch (err) {
+    addLogEntry('error', `Error al conectar: ${err.message}`);
     connectBtn.disabled = false;
-    connectBtn.textContent = 'Connect';
+    connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
   }
 }
 
-/**
- * Disconnect from serial port
- */
 async function disconnectFromSerial() {
   disconnectBtn.disabled = true;
-  disconnectBtn.textContent = 'Disconnecting...';
+  disconnectBtn.innerHTML = `<span>Desconectando...</span>`;
 
   try {
     const result = await ipcRenderer.invoke('disconnect-serial-port');
-
     if (result.success) {
-      addLogEntry('info', 'Serial port disconnected');
+      addLogEntry('info', 'Balanza desconectada.');
     } else {
-      addLogEntry('error', `Failed to disconnect: ${result.error}`);
+      addLogEntry('error', `Error al desconectar: ${result.error}`);
     }
-  } catch (error) {
-    addLogEntry('error', `Disconnection error: ${error.message}`);
+  } catch (err) {
+    addLogEntry('error', `Error: ${err.message}`);
   } finally {
     disconnectBtn.disabled = false;
-    disconnectBtn.textContent = 'Disconnect';
+    disconnectBtn.innerHTML = `<span>Desconectar</span>`;
   }
 }
 
-/**
- * Refresh available serial ports
- */
 async function refreshSerialPorts() {
   refreshPortsBtn.disabled = true;
-  refreshPortsBtn.textContent = 'Refreshing...';
 
   try {
     const result = await ipcRenderer.invoke('list-serial-ports');
-
     if (result.success) {
       populateSerialPorts(result.ports);
-      addLogEntry('info', `Found ${result.ports.length} serial ports`);
+      addLogEntry('info', `Puertos COM detectados: ${result.ports.length}`);
     } else {
-      addLogEntry('error', `Failed to list ports: ${result.error}`);
+      addLogEntry('error', `Error al listar puertos: ${result.error}`);
     }
-  } catch (error) {
-    addLogEntry('error', `Error listing ports: ${error.message}`);
+  } catch (err) {
+    addLogEntry('error', `Error al refrescar puertos: ${err.message}`);
   } finally {
     refreshPortsBtn.disabled = false;
-    refreshPortsBtn.textContent = 'Refresh Ports';
   }
 }
 
-/**
- * Populate serial ports dropdown
- */
 function populateSerialPorts(ports) {
-  // Clear existing options except the first one
-  serialPortSelect.innerHTML = '<option value="">Select a port...</option>';
+  serialPortSelect.innerHTML = '<option value="">Seleccione un puerto...</option>';
 
   ports.forEach((port) => {
     const option = document.createElement('option');
     option.value = port.path;
-    option.textContent = `${port.path} - ${
-      port.friendlyName || port.manufacturer || 'Unknown'
-    }`;
+    const label = port.friendlyName || port.manufacturer ? `${port.path} - ${port.friendlyName || port.manufacturer}` : port.path;
+    option.textContent = label;
     serialPortSelect.appendChild(option);
   });
 
-  // Enable connect button if a port is selected
-  connectBtn.disabled = !serialPortSelect.value;
+  const savedPort = localStorage.getItem('sobifruits_saved_port');
+  if (savedPort && ports.some((p) => p.path === savedPort)) {
+    serialPortSelect.value = savedPort;
+  }
+
+  connectBtn.disabled = !serialPortSelect.value || serialConnected;
 }
 
 /**
- * Add entry to activity log
+ * Activity Logging
  */
 function addLogEntry(level, message) {
   const timestamp = new Date().toLocaleTimeString();
-  const entry = {
-    timestamp,
-    level,
-    message,
-  };
+  logEntries.push({ timestamp, level, message });
 
-  logEntries.push(entry);
-
-  // Keep only last 100 entries
-  if (logEntries.length > 100) {
+  if (logEntries.length > 150) {
     logEntries.shift();
   }
 
   updateLogDisplay();
 }
 
-/**
- * Update log display
- */
 function updateLogDisplay() {
-  const logHtml = logEntries
-    .map((entry) => {
-      return `<div class="log-entry">
-            <span class="log-timestamp">[${entry.timestamp}]</span>
-            <span class="log-level-${
-              entry.level
-            }">[${entry.level.toUpperCase()}]</span>
-            ${entry.message}
-        </div>`;
+  if (!activityLogEl) return;
+
+  const html = logEntries
+    .map((e) => {
+      const tagClass = `log-tag-${e.level}`;
+      return `
+        <div class="log-entry">
+          <span class="log-time">[${e.timestamp}]</span>
+          <span class="log-tag ${tagClass}">[${e.level.toUpperCase()}]</span>
+          <span class="log-msg">${e.message}</span>
+        </div>
+      `;
     })
     .join('');
 
-  activityLogEl.innerHTML = logHtml;
-
-  // Auto-scroll to bottom
+  activityLogEl.innerHTML = html;
   activityLogEl.scrollTop = activityLogEl.scrollHeight;
 }
 
-/**
- * Clear activity log
- */
 function clearLog() {
   logEntries = [];
-  activityLogEl.innerHTML = '';
-  addLogEntry('info', 'Activity log cleared');
-}
-
-/**
- * Format file size
- */
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-/**
- * Format duration
- */
-function formatDuration(ms) {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m`;
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  } else {
-    return `${seconds}s`;
-  }
+  if (activityLogEl) activityLogEl.innerHTML = '';
+  addLogEntry('info', 'Consola de registros limpia.');
 }
