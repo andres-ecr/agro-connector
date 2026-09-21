@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Balanza - Sobifruits</title>
+    <title>Sistema de Conexión de Balanza - Sobifruits</title>
     <style>
       :root {
         --primary: #1b70b3;
@@ -17,7 +17,6 @@
 
         --bg-main: #ffffff;
         --bg-subtle: #f8fafc;
-        --bg-card: #ffffff;
         --border-color: #e2e8f0;
         --border-light: #f1f5f9;
 
@@ -36,7 +35,6 @@
         --radius-full: 9999px;
 
         --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        --shadow-card: 0 2px 8px -2px rgba(0, 0, 0, 0.06), 0 1px 4px -1px rgba(0, 0, 0, 0.04);
         --shadow-elevated: 0 12px 24px -4px rgba(0, 0, 0, 0.15);
       }
 
@@ -56,11 +54,85 @@
         user-select: none;
         display: flex;
         flex-direction: column;
+        border: 1px solid #155d96;
       }
 
-      /* Minimal Header (Height 56px) */
+      /* ==================== CUSTOM TITLEBAR (DISCORD STYLE) ==================== */
+      .custom-titlebar {
+        height: 32px;
+        background: linear-gradient(90deg, #1b70b3 0%, #155d96 100%);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        -webkit-app-region: drag;
+        padding-left: 10px;
+      }
+
+      .titlebar-brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+
+      .titlebar-icon {
+        width: 15px;
+        height: 15px;
+        object-fit: contain;
+        flex-shrink: 0;
+      }
+
+      .titlebar-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: 0.02em;
+        text-overflow: ellipsis;
+        overflow: hidden;
+      }
+
+      .titlebar-controls {
+        display: flex;
+        height: 100%;
+        -webkit-app-region: no-drag;
+      }
+
+      .titlebar-btn {
+        width: 44px;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        color: #ffffff;
+        cursor: pointer;
+        outline: none;
+        transition: background-color 0.15s ease;
+      }
+
+      .titlebar-btn:hover {
+        background-color: rgba(255, 255, 255, 0.18);
+      }
+
+      .titlebar-btn:active {
+        background-color: rgba(255, 255, 255, 0.28);
+      }
+
+      .titlebar-btn.btn-close:hover {
+        background-color: #e81123 !important;
+        color: #ffffff !important;
+      }
+
+      .titlebar-btn.btn-close:active {
+        background-color: #bf0f1d !important;
+      }
+
+      /* ==================== APP HEADER ==================== */
       .app-header {
-        height: 56px;
+        height: 52px;
         padding: 0 1.25rem;
         display: flex;
         align-items: center;
@@ -79,8 +151,8 @@
       }
 
       .lock-btn {
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
         border-radius: var(--radius-sm);
         border: 1px solid var(--border-color);
         background: #ffffff;
@@ -98,7 +170,7 @@
         border-color: var(--primary-border);
       }
 
-      /* Main Body */
+      /* ==================== MAIN CONTENT ==================== */
       .app-main {
         flex: 1;
         padding: 1.25rem;
@@ -451,7 +523,7 @@
         font-size: 0.7rem;
         padding: 0.75rem;
         border-radius: var(--radius-sm);
-        height: 260px;
+        height: 240px;
         overflow-y: auto;
         line-height: 1.45;
       }
@@ -548,7 +620,32 @@
     </style>
   </head>
   <body>
-    <!-- Top Bar Minimalista -->
+    <!-- Discord-Style Custom Titlebar en Color Principal Sobifruits -->
+    <div class="custom-titlebar">
+      <div class="titlebar-brand">
+        <img src="../assets/sobifruits.png" alt="" class="titlebar-icon" />
+        <span class="titlebar-title">Sistema de Conexión de Balanza - Sobifruits</span>
+      </div>
+      <div class="titlebar-controls">
+        <button class="titlebar-btn" id="winMinimizeBtn" title="Minimizar">
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <path d="M0 5h10v1H0z" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="titlebar-btn" id="winMaximizeBtn" title="Maximizar">
+          <svg width="10" height="10" viewBox="0 0 10 10" id="maximizeIcon">
+            <path d="M0 0v10h10V0H0zm1 1h8v8H1V1z" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="titlebar-btn btn-close" id="winCloseBtn" title="Cerrar">
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <polygon points="10 0.7 9.3 0 5 4.3 0.7 0 0 0.7 4.3 5 0 9.3 0.7 10 5 5.7 9.3 10 10 9.3 5.7 5" fill="currentColor"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- App Header Minimalista -->
     <header class="app-header">
       <img src="../assets/sobifruits.webp" alt="Sobifruits" class="header-logo" />
       <button class="lock-btn" id="modeToggleBtn" title="Acceso a Soporte Técnico">
@@ -591,7 +688,7 @@
           </div>
           <div>
             <div class="sync-title">Conectado al ERP de Sobifruits</div>
-            <div class="sync-desc">Servicio activo en segundo plano</div>
+            <div class="sync-desc">Servicio activo en segundo plano (Puerto 8080)</div>
           </div>
         </div>
       </section>

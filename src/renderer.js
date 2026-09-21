@@ -89,6 +89,44 @@ function initializeElements() {
  * Setup event listeners
  */
 function setupEventListeners() {
+  // Window controls (Discord style titlebar)
+  const winMinimizeBtn = document.getElementById('winMinimizeBtn');
+  const winMaximizeBtn = document.getElementById('winMaximizeBtn');
+  const winCloseBtn = document.getElementById('winCloseBtn');
+  const maximizeIcon = document.getElementById('maximizeIcon');
+
+  if (winMinimizeBtn) {
+    winMinimizeBtn.addEventListener('click', () => {
+      ipcRenderer.invoke('window-minimize');
+    });
+  }
+
+  if (winMaximizeBtn) {
+    winMaximizeBtn.addEventListener('click', async () => {
+      const isMax = await ipcRenderer.invoke('window-maximize');
+      updateMaximizeIcon(isMax);
+    });
+  }
+
+  if (winCloseBtn) {
+    winCloseBtn.addEventListener('click', () => {
+      ipcRenderer.invoke('window-close');
+    });
+  }
+
+  ipcRenderer.on('window-maximized-state', (event, isMax) => {
+    updateMaximizeIcon(isMax);
+  });
+
+  function updateMaximizeIcon(isMax) {
+    if (!maximizeIcon) return;
+    if (isMax) {
+      maximizeIcon.innerHTML = `<path d="M2 0v2H0v8h8V8h2V0H2zm1 1h6v6H8V2H3V1zm-2 2h6v6H1V3z" fill="currentColor"/>`;
+    } else {
+      maximizeIcon.innerHTML = `<path d="M0 0v10h10V0H0zm1 1h8v8H1V1z" fill="currentColor"/>`;
+    }
+  }
+
   // Mode toggle (Header button)
   modeToggleBtn.addEventListener('click', () => {
     if (currentMode === 'operator') {

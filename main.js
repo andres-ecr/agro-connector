@@ -45,13 +45,11 @@ if (!gotTheLock) {
  */
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 400,
+    width: 420,
     height: 600,
     minWidth: 380,
-    minHeight: 560,
-    maxWidth: 480,
-    maxHeight: 680,
-    resizable: false,
+    minHeight: 520,
+    frame: false, // Frameless custom window (Discord style)
     backgroundColor: '#ffffff',
     webPreferences: {
       nodeIntegration: true,
@@ -63,10 +61,11 @@ function createMainWindow() {
       ? path.join(__dirname, 'assets/sobifruits.png')
       : path.join(__dirname, 'assets/logo.ico'),
     show: false,
+    resizable: true,
     minimizable: true,
-    maximizable: false,
+    maximizable: true,
     closable: true,
-    title: 'Balanza - Sobifruits',
+    title: 'Sistema de Conexión de Balanza - Sobifruits',
   });
 
   // Make main window globally accessible
@@ -78,6 +77,18 @@ function createMainWindow() {
   // Handle window events
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  mainWindow.on('maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-maximized-state', true);
+    }
+  });
+
+  mainWindow.on('unmaximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-maximized-state', false);
+    }
   });
 
   // Handle minimize to tray
@@ -333,6 +344,33 @@ ipcMain.handle('simulate-weight', async (event, weight) => {
   console.log(`Manual weight simulated: ${weight}kg for truck-1`);
 
   return { success: true, weight, truckId: 'truck-1' };
+});
+
+// Custom Window Control Handlers (Discord style)
+ipcMain.handle('window-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+  return true;
+});
+
+ipcMain.handle('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+    return mainWindow.isMaximized();
+  }
+  return false;
+});
+
+ipcMain.handle('window-close', () => {
+  if (mainWindow) mainWindow.close();
+  return true;
+});
+
+ipcMain.handle('is-window-maximized', () => {
+  return mainWindow ? mainWindow.isMaximized() : false;
 });
 
 // IPC Handlers
