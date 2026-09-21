@@ -14,12 +14,13 @@ const config = {
 
   // CORS Configuration
   cors: {
-    origin: isDevelopment 
-      ? ['http://localhost:3000', 'http://127.0.0.1:3000'] // Development origins
-      : ['http://localhost:3000', 'http://127.0.0.1:3000'], // Production origins
+    origin: (origin, callback) => {
+      // Allow any origin (localhost, 127.0.0.1, Vercel deployments, production ERP, curl, etc.)
+      callback(null, true);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Tenant-ID'],
   },
 
   // Weight Capture Configuration

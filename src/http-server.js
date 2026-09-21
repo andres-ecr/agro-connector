@@ -32,10 +32,35 @@ class HttpWeightServer {
   }
 
   setupRoutes() {
+    // Private Network Access & CORS headers for Vercel HTTPS -> Localhost support
+    this.app.use((req, res, next) => {
+      res.setHeader('Access-Control-Allow-Private-Network', 'true');
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Tenant-ID');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+      }
+      next();
+    });
+
     // Enable CORS for frontend requests
     this.app.use(cors(config.cors));
 
     this.app.use(express.json());
+
+    // Generic latest weight endpoint (default to truck-1 or first available)
+    this.app.get('/api/weight', (req, res) => {
+      const data = this.weightData['truck-1'] || Object.values(this.weightData)[0] || { value: 0, timestamp: new Date(), connected: false };
+      res.json({
+        success: true,
+        truckId: 'truck-1',
+        weight: data.value,
+        timestamp: data.timestamp,
+        connected: data.connected,
+      });
+    });
 
     // Get latest weight for specific truck
     this.app.get('/api/weight/:truckId', (req, res) => {
