@@ -236,7 +236,7 @@ window.handlePinSubmit = function () {
     switchToSupportMode();
     addLogEntry('info', 'Acceso técnico concedido.');
   } else {
-    pinError.textContent = 'PIN incorrecto. Ingrese el código de soporte.';
+    pinError.textContent = 'PIN incorrecto.';
     pinInput.select();
   }
 };
@@ -245,14 +245,12 @@ function switchToSupportMode() {
   currentMode = 'support';
   viewOperator.classList.remove('active');
   viewSupport.classList.add('active');
-  modeToggleText.textContent = 'Modo Operador';
 }
 
 function switchToOperatorMode() {
   currentMode = 'operator';
   viewSupport.classList.remove('active');
   viewOperator.classList.add('active');
-  modeToggleText.textContent = 'Soporte Técnico';
 }
 
 function handleSaveNewPin() {
@@ -260,24 +258,24 @@ function handleSaveNewPin() {
   const p2 = confirmPinInput.value.trim();
 
   if (!p1 || p1.length < 4) {
-    pinUpdateMsg.style.color = 'var(--danger-dot)';
+    pinUpdateMsg.style.color = '#dc2626';
     pinUpdateMsg.textContent = 'El PIN debe tener al menos 4 dígitos.';
     return;
   }
 
   if (p1 !== p2) {
-    pinUpdateMsg.style.color = 'var(--danger-dot)';
-    pinUpdateMsg.textContent = 'Los PIN no coinciden.';
+    pinUpdateMsg.style.color = '#dc2626';
+    pinUpdateMsg.textContent = 'Los códigos PIN no coinciden.';
     return;
   }
 
   localStorage.setItem('sobifruits_support_pin', p1);
-  pinUpdateMsg.style.color = 'var(--success-text)';
-  pinUpdateMsg.textContent = '✓ PIN actualizado con éxito.';
+  pinUpdateMsg.style.color = '#059669';
+  pinUpdateMsg.textContent = '✓ Clave PIN actualizada.';
   newPinInput.value = '';
   confirmPinInput.value = '';
   setTimeout(() => {
-    pinUpdateMsg.textContent = '';
+    if (pinUpdateMsg) pinUpdateMsg.textContent = '';
   }, 3000);
 }
 
@@ -341,17 +339,14 @@ function startPeriodicUpdates() {
  */
 function updateWeight(data) {
   currentWeight = data.value;
-  weightValueEl.textContent = Number(data.value).toFixed(1);
+  if (weightValueEl) {
+    weightValueEl.textContent = Number(data.value).toFixed(1);
+  }
 
   const timestamp = new Date(data.timestamp || Date.now()).toLocaleTimeString();
-  const portLabel = data.port || currentPortPath || 'Activo';
-  weightMetaEl.innerHTML = `
-    <span>Última lectura: <strong>${timestamp}</strong></span>
-    <span>•</span>
-    <span>Puerto: <strong>${portLabel}</strong></span>
-    <span>•</span>
-    <span style="color: var(--success-text); font-weight: 600;">En Vivo</span>
-  `;
+  if (weightMetaEl) {
+    weightMetaEl.textContent = `Última lectura: ${timestamp} • En vivo`;
+  }
 }
 
 /**
@@ -362,18 +357,27 @@ function updateSerialStatus(status) {
   currentPortPath = status.port || null;
 
   if (serialConnected) {
-    serialStatusEl.className = 'status-pill connected';
-    serialStatusTextEl.textContent = `Balanza: Conectada (${status.port || ''})`;
-    connectBtn.style.display = 'none';
-    disconnectBtn.style.display = 'inline-flex';
-    disconnectBtn.disabled = false;
+    if (serialStatusEl) serialStatusEl.className = 'status-badge connected';
+    if (serialStatusTextEl) serialStatusTextEl.textContent = 'Balanza Conectada';
+    if (connectBtn) connectBtn.style.display = 'none';
+    if (disconnectBtn) {
+      disconnectBtn.style.display = 'inline-flex';
+      disconnectBtn.disabled = false;
+    }
+    if (weightMetaEl) {
+      weightMetaEl.textContent = 'Transmitiendo en vivo al ERP';
+    }
   } else {
-    serialStatusEl.className = 'status-pill disconnected';
-    serialStatusTextEl.textContent = 'Balanza: Desconectada';
-    disconnectBtn.style.display = 'none';
-    connectBtn.style.display = 'inline-flex';
-    connectBtn.disabled = !serialPortSelect.value;
-    weightMetaEl.textContent = 'Balanza desconectada. Seleccione un puerto COM y conecte.';
+    if (serialStatusEl) serialStatusEl.className = 'status-badge disconnected';
+    if (serialStatusTextEl) serialStatusTextEl.textContent = 'Buscando balanza...';
+    if (disconnectBtn) disconnectBtn.style.display = 'none';
+    if (connectBtn) {
+      connectBtn.style.display = 'inline-flex';
+      connectBtn.disabled = !serialPortSelect || !serialPortSelect.value;
+    }
+    if (weightMetaEl) {
+      weightMetaEl.textContent = 'Esperando conexión de balanza';
+    }
   }
 }
 
@@ -387,12 +391,11 @@ function updateAppStatus(status) {
 
   if (status.httpServer) {
     const isRunning = status.httpServer.running;
-    if (isRunning) {
-      httpServerStatusEl.className = 'status-pill connected';
-      httpStatusTextEl.textContent = `Servicio Web :${status.httpServer.port || 8080}`;
-    } else {
-      httpServerStatusEl.className = 'status-pill disconnected';
-      httpStatusTextEl.textContent = 'Servicio Web: Detenido';
+    if (httpServerStatusEl) {
+      httpServerStatusEl.className = isRunning ? 'status-pill connected' : 'status-pill disconnected';
+    }
+    if (httpStatusTextEl) {
+      httpStatusTextEl.textContent = isRunning ? `Servicio Web :${status.httpServer.port || 8080}` : 'Servicio Detenido';
     }
   }
 }
@@ -418,31 +421,39 @@ async function updateClientsCount() {
  * Serial connection actions
  */
 async function connectToSerial() {
+  if (!serialPortSelect || !serialPortSelect.value) return;
   const selectedPort = serialPortSelect.value;
-  if (!selectedPort) return;
 
-  connectBtn.disabled = true;
-  connectBtn.innerHTML = `<span>Conectando...</span>`;
+  if (connectBtn) {
+    connectBtn.disabled = true;
+    connectBtn.innerHTML = `<span>Conectando...</span>`;
+  }
 
   try {
     const result = await ipcRenderer.invoke('connect-serial-port', selectedPort);
     if (result.success) {
-      addLogEntry('success', `Conectado exitosamente al puerto ${selectedPort}`);
+      addLogEntry('success', `Conectado al puerto ${selectedPort}`);
     } else {
       addLogEntry('error', `Fallo de conexión: ${result.error}`);
-      connectBtn.disabled = false;
-      connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
+      if (connectBtn) {
+        connectBtn.disabled = false;
+        connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
+      }
     }
   } catch (err) {
     addLogEntry('error', `Error al conectar: ${err.message}`);
-    connectBtn.disabled = false;
-    connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
+    if (connectBtn) {
+      connectBtn.disabled = false;
+      connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
+    }
   }
 }
 
 async function disconnectFromSerial() {
-  disconnectBtn.disabled = true;
-  disconnectBtn.innerHTML = `<span>Desconectando...</span>`;
+  if (disconnectBtn) {
+    disconnectBtn.disabled = true;
+    disconnectBtn.innerHTML = `<span>Desconectando...</span>`;
+  }
 
   try {
     const result = await ipcRenderer.invoke('disconnect-serial-port');
@@ -454,13 +465,15 @@ async function disconnectFromSerial() {
   } catch (err) {
     addLogEntry('error', `Error: ${err.message}`);
   } finally {
-    disconnectBtn.disabled = false;
-    disconnectBtn.innerHTML = `<span>Desconectar</span>`;
+    if (disconnectBtn) {
+      disconnectBtn.disabled = false;
+      disconnectBtn.innerHTML = `<span>Desconectar</span>`;
+    }
   }
 }
 
 async function refreshSerialPorts() {
-  refreshPortsBtn.disabled = true;
+  if (refreshPortsBtn) refreshPortsBtn.disabled = true;
 
   try {
     const result = await ipcRenderer.invoke('list-serial-ports');
@@ -473,17 +486,18 @@ async function refreshSerialPorts() {
   } catch (err) {
     addLogEntry('error', `Error al refrescar puertos: ${err.message}`);
   } finally {
-    refreshPortsBtn.disabled = false;
+    if (refreshPortsBtn) refreshPortsBtn.disabled = false;
   }
 }
 
 function populateSerialPorts(ports) {
+  if (!serialPortSelect) return;
   serialPortSelect.innerHTML = '<option value="">Seleccione un puerto...</option>';
 
   ports.forEach((port) => {
     const option = document.createElement('option');
     option.value = port.path;
-    const label = port.friendlyName || port.manufacturer ? `${port.path} - ${port.friendlyName || port.manufacturer}` : port.path;
+    const label = port.friendlyName || port.manufacturer ? `${port.path} (${port.friendlyName || port.manufacturer})` : port.path;
     option.textContent = label;
     serialPortSelect.appendChild(option);
   });
@@ -491,9 +505,19 @@ function populateSerialPorts(ports) {
   const savedPort = localStorage.getItem('sobifruits_saved_port');
   if (savedPort && ports.some((p) => p.path === savedPort)) {
     serialPortSelect.value = savedPort;
+  } else if (ports.length > 0) {
+    serialPortSelect.value = ports[0].path;
+    localStorage.setItem('sobifruits_saved_port', ports[0].path);
   }
 
-  connectBtn.disabled = !serialPortSelect.value || serialConnected;
+  if (connectBtn) {
+    connectBtn.disabled = !serialPortSelect.value || serialConnected;
+  }
+
+  // Auto-connect to detected scale port in background
+  if (!serialConnected && serialPortSelect.value) {
+    connectToSerial();
+  }
 }
 
 /**

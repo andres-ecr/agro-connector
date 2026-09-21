@@ -3,42 +3,41 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Conector de Balanza - Sobifruits</title>
+    <title>Balanza - Sobifruits</title>
     <style>
       :root {
         --primary: #1b70b3;
-        --primary-hover: #1766b0;
-        --primary-dark: #155d96;
+        --primary-hover: #155d96;
         --primary-light: #f0f9ff;
         --primary-border: #bae6fd;
-        --accent-navy: #0b2540;
-        --accent-green: #7fc231;
 
         --text-main: #0f172a;
-        --text-secondary: #334155;
-        --text-muted: #64748b;
+        --text-secondary: #475569;
+        --text-muted: #94a3b8;
 
-        --bg-card: #ffffff;
+        --bg-main: #ffffff;
         --bg-subtle: #f8fafc;
+        --bg-card: #ffffff;
         --border-color: #e2e8f0;
-        --border-hover: #cbd5e1;
+        --border-light: #f1f5f9;
 
         --success-bg: #ecfdf5;
-        --success-text: #047857;
+        --success-text: #059669;
         --success-border: #a7f3d0;
         --success-dot: #10b981;
 
-        --danger-bg: #fef2f2;
-        --danger-text: #b91c1c;
-        --danger-border: #fecaca;
-        --danger-dot: #ef4444;
+        --warning-bg: #fffbeb;
+        --warning-text: #d97706;
+        --warning-border: #fde68a;
+        --warning-dot: #f59e0b;
 
         --radius: 12px;
         --radius-sm: 8px;
         --radius-full: 9999px;
 
-        --shadow-card: 0 10px 25px -5px rgba(0, 0, 0, 0.22), 0 8px 10px -6px rgba(0, 0, 0, 0.12);
-        --shadow-elevated: 0 20px 30px -8px rgba(0, 0, 0, 0.35);
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-card: 0 2px 8px -2px rgba(0, 0, 0, 0.06), 0 1px 4px -1px rgba(0, 0, 0, 0.04);
+        --shadow-elevated: 0 12px 24px -4px rgba(0, 0, 0, 0.15);
       }
 
       * {
@@ -49,57 +48,29 @@
 
       body {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        background-color: var(--accent-navy);
-        background-image: linear-gradient(
-          135deg,
-          rgba(11, 37, 64, 0.94) 0%,
-          rgba(27, 112, 179, 0.85) 50%,
-          rgba(14, 82, 135, 0.92) 100%
-        ), url('../assets/auth-background.jpg');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
+        background-color: var(--bg-main);
         color: var(--text-main);
+        width: 100vw;
         height: 100vh;
-        overflow-x: hidden;
+        overflow: hidden;
         user-select: none;
         display: flex;
         flex-direction: column;
       }
 
-      /* Header Glassmorphic */
+      /* Minimal Header (Height 56px) */
       .app-header {
-        background: rgba(11, 37, 64, 0.86);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-        padding: 0.85rem 1.75rem;
+        height: 56px;
+        padding: 0 1.25rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        flex-shrink: 0;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-      }
-
-      .brand-group {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-      }
-
-      .brand-logo-card {
+        border-bottom: 1px solid var(--border-light);
         background: #ffffff;
-        padding: 5px 12px;
-        border-radius: var(--radius-sm);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-        border: 1px solid rgba(255, 255, 255, 0.8);
+        flex-shrink: 0;
       }
 
-      .brand-logo-img {
+      .header-logo {
         height: 28px;
         width: auto;
         max-width: 130px;
@@ -107,360 +78,169 @@
         display: block;
       }
 
-      .brand-divider {
-        width: 1px;
-        height: 28px;
-        background: rgba(255, 255, 255, 0.2);
-      }
-
-      .brand-text h1 {
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #ffffff;
-        letter-spacing: -0.01em;
-        line-height: 1.2;
-      }
-
-      .brand-text p {
-        font-size: 0.75rem;
-        color: #93c5fd;
-        display: flex;
-        align-items: center;
-        gap: 0.35rem;
-        font-weight: 500;
-      }
-
-      .header-right {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-      }
-
-      .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        padding: 0.4rem 0.85rem;
-        border-radius: var(--radius-full);
-        font-size: 0.75rem;
-        font-weight: 600;
-        line-height: 1;
-        transition: all 0.2s ease;
-        backdrop-filter: blur(8px);
-      }
-
-      .status-pill.connected {
-        background: rgba(236, 253, 245, 0.95);
-        border: 1px solid var(--success-border);
-        color: var(--success-text);
-        box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15);
-      }
-
-      .status-pill.disconnected {
-        background: rgba(254, 242, 242, 0.95);
-        border: 1px solid var(--danger-border);
-        color: var(--danger-text);
-      }
-
-      .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: currentColor;
-      }
-
-      .status-pill.connected .status-dot {
-        background: var(--success-dot);
-        animation: pulse 2s infinite;
-      }
-
-      .status-pill.disconnected .status-dot {
-        background: var(--danger-dot);
-      }
-
-      @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-        70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-      }
-
-      .mode-toggle-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        padding: 0.42rem 0.9rem;
+      .lock-btn {
+        width: 34px;
+        height: 34px;
         border-radius: var(--radius-sm);
-        font-size: 0.8125rem;
-        font-weight: 600;
-        background: rgba(255, 255, 255, 0.12);
-        border: 1px solid rgba(255, 255, 255, 0.22);
-        color: #ffffff;
+        border: 1px solid var(--border-color);
+        background: #ffffff;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
         transition: all 0.15s ease;
-        backdrop-filter: blur(8px);
       }
 
-      .mode-toggle-btn:hover {
-        background: rgba(255, 255, 255, 0.22);
-        border-color: rgba(255, 255, 255, 0.35);
-        transform: translateY(-1px);
+      .lock-btn:hover {
+        background: var(--bg-subtle);
+        color: var(--primary);
+        border-color: var(--primary-border);
       }
 
-      /* Main container */
-      .app-body {
+      /* Main Body */
+      .app-main {
         flex: 1;
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
         overflow-y: auto;
-        padding: 1.75rem;
-        max-width: 920px;
-        width: 100%;
-        margin: 0 auto;
       }
 
       /* Views */
       .view-panel {
         display: none;
+        height: 100%;
       }
 
       .view-panel.active {
-        display: block;
-        animation: fadeIn 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        animation: fadeIn 0.15s ease;
       }
 
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(4px); }
+        from { opacity: 0; transform: translateY(2px); }
         to { opacity: 1; transform: translateY(0); }
       }
 
-      /* Cards matching Login aesthetic */
-      .card {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        padding: 1.5rem;
-        box-shadow: var(--shadow-card);
-        margin-bottom: 1.25rem;
-      }
-
-      .card-header {
+      /* Operator View Layout */
+      .operator-content {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        justify-content: space-between;
-        margin-bottom: 1rem;
+        justify-content: center;
+        flex: 1;
+        padding: 0.5rem 0;
       }
 
-      .card-title {
-        font-size: 0.95rem;
-        font-weight: 700;
-        color: var(--text-main);
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-
-      .card-title svg {
-        color: var(--primary);
-      }
-
-      /* Operator Hero Weight Display */
-      .weight-hero {
-        text-align: center;
-        padding: 2.25rem 1.5rem;
-        background: #ffffff;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow-card);
-        margin-bottom: 1.25rem;
-        position: relative;
-        overflow: hidden;
-      }
-
-      .weight-hero::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, #1b70b3 0%, #7fc231 100%);
-      }
-
-      .weight-hero-badge {
+      /* Live Status Badge */
+      .status-badge {
         display: inline-flex;
         align-items: center;
-        gap: 0.4rem;
-        padding: 0.3rem 0.75rem;
+        gap: 0.45rem;
+        padding: 0.35rem 0.85rem;
         border-radius: var(--radius-full);
-        background: var(--primary-light);
-        border: 1px solid var(--primary-border);
-        color: var(--primary);
         font-size: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 1.25rem;
+        transition: all 0.2s ease;
+      }
+
+      .status-badge.connected {
+        background: var(--success-bg);
+        border: 1px solid var(--success-border);
+        color: var(--success-text);
+      }
+
+      .status-badge.disconnected {
+        background: var(--warning-bg);
+        border: 1px solid var(--warning-border);
+        color: var(--warning-text);
+      }
+
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .status-badge.connected .status-dot {
+        background: var(--success-dot);
+        animation: pulse 2s infinite;
+      }
+
+      .status-badge.disconnected .status-dot {
+        background: var(--warning-dot);
+      }
+
+      @keyframes pulse {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+        70% { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+      }
+
+      /* Weight Hero Card */
+      .weight-card {
+        width: 100%;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 2.25rem 1.5rem;
+        text-align: center;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 1.25rem;
+      }
+
+      .weight-label {
+        font-size: 0.6875rem;
         font-weight: 700;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
+        color: var(--text-muted);
         margin-bottom: 0.75rem;
       }
 
-      .weight-value-container {
-        display: flex;
-        align-items: baseline;
-        justify-content: center;
-        gap: 0.6rem;
-      }
-
-      .weight-value {
-        font-size: 5rem;
+      .weight-number {
+        font-size: 4.75rem;
         font-weight: 800;
-        letter-spacing: -0.04em;
         color: var(--text-main);
         line-height: 1;
+        letter-spacing: -0.04em;
         font-variant-numeric: tabular-nums;
       }
 
       .weight-unit {
-        font-size: 2rem;
+        font-size: 1.125rem;
         font-weight: 700;
         color: var(--primary);
+        letter-spacing: 0.05em;
+        margin-top: 0.5rem;
       }
 
-      .weight-meta-line {
-        margin-top: 1.15rem;
-        font-size: 0.8125rem;
-        color: var(--text-secondary);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        padding: 0.45rem 1rem;
-        background: #f8fafc;
-        border-radius: var(--radius-full);
-        display: inline-flex;
-        border: 1px solid var(--border-color);
+      .weight-meta {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.85rem;
       }
 
-      /* Control Form */
-      .form-grid {
-        display: grid;
-        grid-template-columns: 1fr auto auto;
-        gap: 0.75rem;
-        align-items: flex-end;
-      }
-
-      .form-field {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-      }
-
-      .form-field label {
-        font-size: 0.8125rem;
-        font-weight: 600;
-        color: var(--text-secondary);
-      }
-
-      .custom-select {
-        height: 2.65rem;
-        padding: 0 0.95rem;
-        border-radius: var(--radius-sm);
-        border: 1px solid var(--border-color);
-        background-color: #ffffff;
-        color: var(--text-main);
-        font-size: 0.875rem;
-        font-weight: 500;
-        outline: none;
-        cursor: pointer;
-        transition: all 0.15s ease;
-      }
-
-      .custom-select:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(27, 112, 179, 0.18);
-      }
-
-      /* Buttons styled identically to Login submit button */
-      .btn {
-        height: 2.65rem;
-        padding: 0 1.25rem;
-        border-radius: var(--radius-sm);
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.5rem;
-        border: 1px solid transparent;
-        transition: all 0.15s ease;
-        white-space: nowrap;
-      }
-
-      .btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        box-shadow: none !important;
-      }
-
-      .btn-primary {
-        background: linear-gradient(135deg, #1b70b3 0%, #155d96 100%);
-        border: 1px solid #104e80;
-        color: #ffffff;
-        box-shadow: 0 4px 14px rgba(27, 112, 179, 0.35);
-      }
-
-      .btn-primary:hover:not(:disabled) {
-        background: linear-gradient(135deg, #2080cc 0%, #1766b0 100%);
-        box-shadow: 0 6px 18px rgba(27, 112, 179, 0.45);
-        border-color: #12588f;
-        transform: translateY(-1px);
-      }
-
-      .btn-outline {
-        background-color: #ffffff;
-        border: 1px solid var(--border-color);
-        color: var(--text-secondary);
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-      }
-
-      .btn-outline:hover:not(:disabled) {
-        background-color: var(--bg-subtle);
-        border-color: var(--border-hover);
-        color: var(--text-main);
-      }
-
-      .btn-danger {
-        background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-        border: 1px solid #991b1b;
-        color: #ffffff;
-        box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
-      }
-
-      .btn-danger:hover:not(:disabled) {
-        background: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
-        box-shadow: 0 6px 18px rgba(239, 68, 68, 0.4);
-      }
-
-      .btn-sm {
-        height: 2.15rem;
-        padding: 0 0.85rem;
-        font-size: 0.8125rem;
-      }
-
-      /* Web Integration Card */
-      .integration-card {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        border-left: 4px solid var(--primary);
+      /* Integration Footer Card */
+      .sync-box {
+        width: 100%;
+        padding: 0.85rem 1rem;
         border-radius: var(--radius);
-        padding: 1.15rem 1.35rem;
+        background: #ffffff;
+        border: 1px solid var(--border-color);
         display: flex;
         align-items: center;
-        gap: 1.15rem;
-        box-shadow: var(--shadow-card);
+        gap: 0.75rem;
       }
 
-      .integration-icon {
-        width: 42px;
-        height: 42px;
+      .sync-icon {
+        width: 32px;
+        height: 32px;
         border-radius: 50%;
         background: var(--primary-light);
         color: var(--primary);
@@ -468,183 +248,232 @@
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        border: 1px solid var(--primary-border);
       }
 
-      .integration-content {
-        flex: 1;
-      }
-
-      .integration-title {
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: var(--text-main);
-        margin-bottom: 0.2rem;
-      }
-
-      .integration-desc {
+      .sync-title {
         font-size: 0.8125rem;
-        color: var(--text-secondary);
-        line-height: 1.45;
+        font-weight: 600;
+        color: var(--text-main);
+        line-height: 1.2;
       }
 
-      /* Support View Elements - Styled like Dev Quick Login panel in Login */
-      .support-banner {
-        background: rgba(15, 23, 42, 0.92);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        color: #ffffff;
-        padding: 0.85rem 1.35rem;
-        border-radius: var(--radius);
+      .sync-desc {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+
+      /* ==================== VISTA SOPORTE TÉCNICO ==================== */
+      .support-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin-bottom: 1.25rem;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
       }
 
-      .support-banner-title {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
+      .support-title {
         font-size: 0.9375rem;
         font-weight: 700;
-        color: #f59e0b;
-      }
-
-      .support-tabs {
+        color: var(--text-main);
         display: flex;
-        gap: 0.5rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-        margin-bottom: 1.25rem;
-        padding-bottom: 0.25rem;
+        align-items: center;
+        gap: 0.45rem;
       }
 
-      .tab-btn {
-        padding: 0.65rem 1.15rem;
-        font-size: 0.8125rem;
+      .back-btn {
+        font-size: 0.775rem;
         font-weight: 600;
-        color: rgba(255, 255, 255, 0.7);
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: var(--radius-sm);
+        color: var(--primary);
+        background: none;
+        border: none;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
-        gap: 0.45rem;
+        gap: 0.35rem;
+      }
+
+      .back-btn:hover {
+        text-decoration: underline;
+      }
+
+      /* Minimal Tabs */
+      .support-tabs {
+        display: flex;
+        gap: 0.35rem;
+        margin-bottom: 1rem;
+        background: var(--bg-subtle);
+        padding: 3px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-color);
+      }
+
+      .tab-btn {
+        flex: 1;
+        padding: 0.45rem 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: center;
         transition: all 0.15s ease;
       }
 
-      .tab-btn:hover {
-        color: #ffffff;
-        background: rgba(255, 255, 255, 0.12);
-      }
-
       .tab-btn.active {
-        color: #ffffff;
-        background: var(--primary);
-        border-color: #38bdf8;
-        box-shadow: 0 4px 12px rgba(27, 112, 179, 0.35);
+        background: #ffffff;
+        color: var(--primary);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
       }
 
       .tab-content {
         display: none;
+        flex: 1;
+        overflow-y: auto;
       }
 
       .tab-content.active {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
       }
 
-      /* Simulator presets */
-      .preset-chips {
+      .form-group {
         display: flex;
-        gap: 0.5rem;
-        margin-top: 0.85rem;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .form-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+
+      .custom-select, .form-input {
+        width: 100%;
+        height: 2.35rem;
+        padding: 0 0.75rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-color);
+        background: #ffffff;
+        color: var(--text-main);
+        font-size: 0.8125rem;
+        outline: none;
+        transition: border-color 0.15s ease;
+      }
+
+      .custom-select:focus, .form-input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(27, 112, 179, 0.12);
+      }
+
+      /* Compact Buttons */
+      .btn {
+        height: 2.35rem;
+        padding: 0 0.95rem;
+        border-radius: var(--radius-sm);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        border: 1px solid transparent;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+      }
+
+      .btn-primary {
+        background: var(--primary);
+        color: #ffffff;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: var(--primary-hover);
+      }
+
+      .btn-outline {
+        background: #ffffff;
+        border-color: var(--border-color);
+        color: var(--text-main);
+      }
+
+      .btn-outline:hover:not(:disabled) {
+        background: var(--bg-subtle);
+      }
+
+      .btn-danger {
+        background: #dc2626;
+        color: #ffffff;
+      }
+
+      .btn-danger:hover:not(:disabled) {
+        background: #b91c1c;
+      }
+
+      .btn-sm {
+        height: 2rem;
+        padding: 0 0.65rem;
+        font-size: 0.75rem;
+      }
+
+      .chips-row {
+        display: flex;
+        gap: 0.35rem;
         flex-wrap: wrap;
       }
 
       .chip-btn {
-        padding: 0.4rem 0.85rem;
+        padding: 0.3rem 0.6rem;
         border-radius: var(--radius-full);
-        background: #f1f5f9;
+        background: var(--bg-subtle);
         border: 1px solid var(--border-color);
-        font-size: 0.775rem;
-        font-weight: 600;
+        font-size: 0.75rem;
+        font-weight: 500;
         color: var(--text-secondary);
         cursor: pointer;
-        transition: all 0.15s ease;
       }
 
       .chip-btn:hover {
         background: var(--primary-light);
-        border-color: var(--primary-border);
         color: var(--primary);
+        border-color: var(--primary-border);
       }
 
-      /* Console Logs */
-      .console-box {
-        background: #090d16;
+      .terminal-box {
+        background: #0f172a;
         color: #f1f5f9;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 0.75rem;
-        padding: 1rem;
+        font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.7rem;
+        padding: 0.75rem;
         border-radius: var(--radius-sm);
-        height: 220px;
+        height: 260px;
         overflow-y: auto;
-        line-height: 1.55;
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        line-height: 1.45;
       }
 
-      .log-entry {
-        margin-bottom: 0.25rem;
-        display: flex;
-        gap: 0.5rem;
-      }
-
-      .log-time {
-        color: #64748b;
-        flex-shrink: 0;
-      }
-
-      .log-tag {
-        font-weight: 700;
-        flex-shrink: 0;
-      }
-
-      .log-tag-info { color: #38bdf8; }
-      .log-tag-success { color: #4ade80; }
-      .log-tag-error { color: #f87171; }
-      .log-tag-warning { color: #facc15; }
-
-      .log-msg {
-        color: #e2e8f0;
-        word-break: break-all;
-      }
-
-      /* Modal PIN - Matching Login Form */
+      /* Modal PIN (Discreet & Secure) */
       .modal-backdrop {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(11, 37, 64, 0.75);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
+        background: rgba(15, 23, 42, 0.45);
+        backdrop-filter: blur(4px);
         display: none;
         align-items: center;
         justify-content: center;
         z-index: 100;
+        padding: 1.25rem;
       }
 
       .modal-backdrop.open {
         display: flex;
-        animation: modalFadeIn 0.15s ease;
-      }
-
-      @keyframes modalFadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
       }
 
       .modal-card {
@@ -652,410 +481,226 @@
         border-radius: 14px;
         box-shadow: var(--shadow-elevated);
         width: 100%;
-        max-width: 400px;
-        padding: 2.25rem 2rem;
-        border: 1px solid rgba(255, 255, 255, 0.8);
-        transform: scale(0.98);
-        animation: modalZoom 0.15s ease forwards;
+        max-width: 320px;
+        padding: 1.75rem 1.5rem;
         text-align: center;
+        border: 1px solid var(--border-color);
       }
 
-      @keyframes modalZoom {
-        to { transform: scale(1); }
-      }
-
-      .modal-logo-badge {
-        display: inline-flex;
+      .modal-lock-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--primary-light);
+        color: var(--primary);
+        display: flex;
         align-items: center;
         justify-content: center;
-        padding: 6px 14px;
-        background: #f8fafc;
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-sm);
-        margin-bottom: 1.25rem;
-      }
-
-      .modal-logo-badge img {
-        height: 32px;
-        width: auto;
-        object-fit: contain;
+        margin: 0 auto 0.85rem auto;
       }
 
       .modal-title {
-        font-size: 1.35rem;
+        font-size: 1.05rem;
         font-weight: 700;
         color: var(--text-main);
-        margin-bottom: 0.35rem;
-      }
-
-      .modal-subtitle {
-        font-size: 0.85rem;
-        color: var(--primary);
-        font-weight: 600;
-        margin-bottom: 0.75rem;
       }
 
       .modal-desc {
-        font-size: 0.8125rem;
+        font-size: 0.775rem;
         color: var(--text-muted);
-        line-height: 1.45;
-        margin-bottom: 1.5rem;
+        margin: 0.35rem 0 1.25rem 0;
       }
 
       .pin-input {
         width: 100%;
-        height: 3rem;
-        padding: 0 1rem;
+        height: 2.75rem;
+        padding: 0 0.75rem;
         text-align: center;
         font-size: 1.5rem;
-        font-weight: 700;
         letter-spacing: 0.35em;
         border-radius: var(--radius-sm);
         border: 1.5px solid var(--border-color);
         outline: none;
-        margin-bottom: 0.5rem;
-        transition: all 0.15s ease;
-        background: #f8fafc;
-        color: var(--text-main);
+        margin-bottom: 0.35rem;
       }
 
       .pin-input:focus {
         border-color: var(--primary);
-        background: #ffffff;
-        box-shadow: 0 0 0 4px rgba(27, 112, 179, 0.18);
+        box-shadow: 0 0 0 3px rgba(27, 112, 179, 0.15);
       }
 
       .pin-error-msg {
-        font-size: 0.775rem;
-        color: var(--danger-dot);
-        font-weight: 600;
-        text-align: center;
-        min-height: 1.25rem;
-        margin-bottom: 1rem;
+        font-size: 0.75rem;
+        color: #dc2626;
+        min-height: 1.15rem;
+        margin-bottom: 0.85rem;
+        font-weight: 500;
       }
 
       .modal-actions {
         display: flex;
-        gap: 0.75rem;
+        gap: 0.5rem;
       }
 
       .modal-actions .btn {
         flex: 1;
       }
-
-      .pin-hint {
-        margin-top: 1rem;
-        font-size: 0.75rem;
-        color: var(--text-muted);
-      }
-
-      /* Footer Glassmorphic */
-      .app-footer {
-        background: rgba(11, 37, 64, 0.86);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border-top: 1px solid rgba(255, 255, 255, 0.14);
-        padding: 0.65rem 1.75rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 0.775rem;
-        color: rgba(255, 255, 255, 0.7);
-        flex-shrink: 0;
-      }
-
-      .app-footer strong {
-        color: #ffffff;
-      }
     </style>
   </head>
   <body>
-    <!-- App Header con Logo Sobifruits oficial -->
+    <!-- Top Bar Minimalista -->
     <header class="app-header">
-      <div class="brand-group">
-        <div class="brand-logo-card">
-          <img src="../assets/sobifruits.webp" alt="Sobifruits" class="brand-logo-img" />
-        </div>
-        <div class="brand-divider"></div>
-        <div class="brand-text">
-          <h1>Conector de Balanza</h1>
-          <p>
-            <span>Sistema de Captura de Peso</span>
-            <span>•</span>
-            <span id="versionLabel">v1.0.0</span>
-          </p>
-        </div>
-      </div>
-
-      <div class="header-right">
-        <!-- Status Balanza -->
-        <div class="status-pill disconnected" id="serialStatus">
-          <span class="status-dot"></span>
-          <span id="serialStatusText">Balanza: Desconectada</span>
-        </div>
-
-        <!-- Status Web Service -->
-        <div class="status-pill connected" id="httpServerStatus">
-          <span class="status-dot"></span>
-          <span id="httpStatusText">Servicio Web :8080</span>
-        </div>
-
-        <!-- Botón Acceso Soporte / Volver -->
-        <button class="mode-toggle-btn" id="modeToggleBtn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <span id="modeToggleText">Soporte Técnico</span>
-        </button>
-      </div>
+      <img src="../assets/sobifruits.webp" alt="Sobifruits" class="header-logo" />
+      <button class="lock-btn" id="modeToggleBtn" title="Acceso a Soporte Técnico">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </button>
     </header>
 
     <!-- Main Container -->
-    <main class="app-body">
+    <main class="app-main">
       <!-- ==================== 1. VISTA OPERADOR (DEFAULT) ==================== -->
       <section class="view-panel active" id="viewOperator">
-        <!-- Display de Peso Principal -->
-        <div class="weight-hero">
-          <div class="weight-hero-badge">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 16 14"/>
-            </svg>
-            <span>Lectura en Tiempo Real</span>
+        <div class="operator-content">
+          <!-- Indicador de Estado Limpio -->
+          <div class="status-badge connected" id="serialStatus">
+            <span class="status-dot"></span>
+            <span id="serialStatusText">Balanza Lista</span>
           </div>
-          <div class="weight-value-container">
-            <span class="weight-value" id="weightValue">0.0</span>
-            <span class="weight-unit">kg</span>
-          </div>
-          <div class="weight-meta-line" id="weightMeta">
-            Esperando transmisión de peso desde la balanza...
+
+          <!-- Display de Peso Hero -->
+          <div class="weight-card">
+            <div class="weight-label">Lectura de Balanza</div>
+            <div class="weight-number" id="weightValue">0.0</div>
+            <div class="weight-unit">KG</div>
+            <div class="weight-meta" id="weightMeta">Transmitiendo en vivo</div>
           </div>
         </div>
 
-        <!-- Card de Conexión Serial -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2v20"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-              <span>Conexión de Balanza (Puerto Serial)</span>
-            </div>
-          </div>
-
-          <div class="form-grid">
-            <div class="form-field">
-              <label for="serialPort">Puerto COM Detectado</label>
-              <select class="custom-select" id="serialPort">
-                <option value="">Seleccione un puerto...</option>
-              </select>
-            </div>
-
-            <button class="btn btn-outline" id="refreshPortsBtn" type="button" title="Refrescar puertos detectados">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                <path d="M21 3v5h-5"/>
-                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                <path d="M8 16H3v5"/>
-              </svg>
-              <span>Actualizar</span>
-            </button>
-
-            <!-- Botones de Conectar / Desconectar -->
-            <button class="btn btn-primary" id="connectBtn" disabled>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 12h14"/>
-                <path d="m12 5 7 7-7 7"/>
-              </svg>
-              <span>Conectar Balanza</span>
-            </button>
-
-            <button class="btn btn-danger" id="disconnectBtn" style="display: none;">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="15" y1="9" x2="9" y2="15"/>
-                <line x1="9" y1="9" x2="15" y2="15"/>
-              </svg>
-              <span>Desconectar</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Card de Integración Web -->
-        <div class="integration-card">
-          <div class="integration-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="2" y1="12" x2="22" y2="12"/>
-              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        <!-- Indicador de Sincronización Web -->
+        <div class="sync-box">
+          <div class="sync-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+              <line x1="12" y1="20" x2="12.01" y2="20"/>
             </svg>
           </div>
-          <div class="integration-content">
-            <div class="integration-title">Integración Activa con el ERP Web de Sobifruits</div>
-            <div class="integration-desc">
-              El conector expone el puerto HTTP local <strong>8080</strong> para que el módulo de pesaje en el navegador capture los pesos brutos de forma directa y automática.
-            </div>
+          <div>
+            <div class="sync-title">Conectado al ERP de Sobifruits</div>
+            <div class="sync-desc">Servicio activo en segundo plano</div>
           </div>
         </div>
       </section>
 
       <!-- ==================== 2. VISTA SOPORTE TÉCNICO ==================== -->
       <section class="view-panel" id="viewSupport">
-        <!-- Banner de Modo Soporte -->
-        <div class="support-banner">
-          <div class="support-banner-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="support-header">
+          <div class="support-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
             </svg>
-            <span>Modo Soporte Técnico & Diagnóstico</span>
+            <span>Soporte Técnico</span>
           </div>
-          <button class="btn btn-outline btn-sm" id="exitSupportBtn" style="color: #ffffff; background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.25);">
-            Bloquear y Salir
+          <button class="back-btn" id="exitSupportBtn">
+            <span>← Salir</span>
           </button>
         </div>
 
         <!-- Pestañas de Soporte -->
         <div class="support-tabs">
-          <button class="tab-btn active" data-tab="simulador">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-            <span>Simulador de Peso</span>
-          </button>
-          <button class="tab-btn" data-tab="clientes">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect width="16" height="20" x="4" y="2" rx="2" ry="2"/>
-              <line x1="9" y1="22" x2="15" y2="22"/>
-              <line x1="8" y1="6" x2="16" y2="6"/>
-            </svg>
-            <span>Servidor HTTP</span>
-          </button>
-          <button class="tab-btn" data-tab="logs">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="4 17 10 11 4 5"/>
-              <line x1="12" y1="19" x2="20" y2="19"/>
-            </svg>
-            <span>Consola de Logs</span>
-          </button>
-          <button class="tab-btn" data-tab="seguridad">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            <span>Seguridad PIN</span>
-          </button>
+          <button class="tab-btn active" data-tab="puerto">Balanza</button>
+          <button class="tab-btn" data-tab="simulador">Simulador</button>
+          <button class="tab-btn" data-tab="seguridad">Clave PIN</button>
+          <button class="tab-btn" data-tab="logs">Logs</button>
         </div>
 
-        <!-- Tab 1: Simulador -->
-        <div class="tab-content active" id="tabContent-simulador">
-          <div class="card">
-            <div class="card-title" style="margin-bottom: 0.75rem;">
-              Simulación de Peso para Pruebas en Planta
-            </div>
-            <p style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 1.25rem;">
-              Emite un valor de peso artificial al servidor HTTP local (puerto 8080) para verificar que el ERP web reciba datos cuando no hay una balanza física conectada.
-            </p>
-
-            <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-              <div class="form-field" style="flex: 1;">
-                <label for="testWeight">Valor de Peso Manual (kg)</label>
-                <input type="number" id="testWeight" class="custom-select" step="0.1" min="0" placeholder="Ej: 550.0" />
-              </div>
-              <button class="btn btn-primary" id="sendTestWeight">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13"/>
-                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-                </svg>
-                <span>Emitir Peso</span>
+        <!-- Tab 1: Puerto COM -->
+        <div class="tab-content active" id="tabContent-puerto">
+          <div class="form-group">
+            <label class="form-label">Puerto Serial COM</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <select class="custom-select" id="serialPort">
+                <option value="">Detectando puertos...</option>
+              </select>
+              <button class="btn btn-outline btn-sm" id="refreshPortsBtn" type="button" title="Refrescar puertos">
+                ↻
               </button>
             </div>
+          </div>
 
-            <div class="preset-chips">
-              <button type="button" class="chip-btn" onclick="setPresetWeight(0.0)">0.0 kg (Tara limpia)</button>
-              <button type="button" class="chip-btn" onclick="setPresetWeight(100.0)">100.0 kg</button>
-              <button type="button" class="chip-btn" onclick="setPresetWeight(572.5)">572.5 kg (Carga estándar)</button>
-              <button type="button" class="chip-btn" onclick="setPresetWeight(1250.0)">1,250.0 kg (Palet completo)</button>
-            </div>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <button class="btn btn-primary" id="connectBtn" style="flex: 1;" disabled>Conectar Balanza</button>
+            <button class="btn btn-danger" id="disconnectBtn" style="flex: 1; display: none;">Desconectar</button>
+          </div>
+
+          <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-subtle); border-radius: var(--radius-sm); font-size: 0.75rem; color: var(--text-secondary);">
+            <div><strong>Servidor Web:</strong> <span id="httpServerInfo">http://localhost:8080</span></div>
+            <div style="margin-top: 0.25rem;"><strong>Navegadores activos:</strong> <span id="clientCount">0</span></div>
           </div>
         </div>
 
-        <!-- Tab 2: Servidor HTTP & Clientes -->
-        <div class="tab-content" id="tabContent-clientes">
-          <div class="card">
-            <div class="card-title" style="margin-bottom: 0.75rem;">
-              Estado del Servidor HTTP Local
+        <!-- Tab 2: Simulador -->
+        <div class="tab-content" id="tabContent-simulador">
+          <div class="form-group">
+            <label class="form-label">Simular Peso para Pruebas (kg)</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <input type="number" id="testWeight" class="form-input" step="0.1" min="0" placeholder="Ej: 550.0" />
+              <button class="btn btn-primary btn-sm" id="sendTestWeight">Enviar</button>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
-              <div style="padding: 1rem; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">URL DEL ENDPOINT</div>
-                <div style="font-size: 1.05rem; font-weight: 700; color: var(--primary); margin-top: 0.25rem;" id="httpServerInfo">http://localhost:8080</div>
-              </div>
-              <div style="padding: 1rem; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">CLIENTES WEB ACTIVOS</div>
-                <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-main); margin-top: 0.25rem;" id="clientCount">0</div>
-              </div>
-            </div>
+          </div>
 
-            <div class="card-title" style="font-size: 0.875rem; margin-bottom: 0.5rem;">
-              Registro de Clientes Conectados
-            </div>
-            <div id="clientsList" style="font-size: 0.8125rem; color: var(--text-muted); padding: 0.85rem; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-              Esperando peticiones desde el navegador web...
-            </div>
+          <div class="chips-row" style="margin-top: 0.5rem;">
+            <button type="button" class="chip-btn" onclick="setPresetWeight(0.0)">0.0 kg</button>
+            <button type="button" class="chip-btn" onclick="setPresetWeight(100.0)">100.0 kg</button>
+            <button type="button" class="chip-btn" onclick="setPresetWeight(572.5)">572.5 kg</button>
+            <button type="button" class="chip-btn" onclick="setPresetWeight(1250.0)">1,250 kg</button>
           </div>
         </div>
 
-        <!-- Tab 3: Consola de Logs -->
-        <div class="tab-content" id="tabContent-logs">
-          <div class="card">
-            <div class="card-header" style="margin-bottom: 0.5rem;">
-              <div class="card-title">Registro de Eventos y Diagnóstico de Balanza</div>
-              <button class="btn btn-outline btn-sm" id="clearLogBtn">Limpiar Consola</button>
-            </div>
-            <div class="console-box" id="activityLog"></div>
-          </div>
-        </div>
-
-        <!-- Tab 4: Seguridad PIN -->
+        <!-- Tab 3: Seguridad PIN -->
         <div class="tab-content" id="tabContent-seguridad">
-          <div class="card">
-            <div class="card-title" style="margin-bottom: 0.75rem;">
-              Cambiar Clave PIN de Acceso Técnico
-            </div>
-            <p style="font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 1.25rem;">
-              El PIN por defecto es <strong>1234</strong>. Puede actualizarlo para evitar modificaciones no autorizadas por los operarios de balanza.
-            </p>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; max-width: 450px;">
-              <div class="form-field">
-                <label for="newPinInput">Nuevo PIN (4 a 8 dígitos)</label>
-                <input type="password" id="newPinInput" class="custom-select" maxlength="8" placeholder="••••" />
-              </div>
-              <div class="form-field">
-                <label for="confirmPinInput">Confirmar Nuevo PIN</label>
-                <input type="password" id="confirmPinInput" class="custom-select" maxlength="8" placeholder="••••" />
-              </div>
-            </div>
-            <div style="margin-top: 1.25rem;">
-              <button class="btn btn-primary btn-sm" id="savePinBtn">Guardar Nuevo PIN</button>
-              <span id="pinUpdateMsg" style="margin-left: 0.75rem; font-size: 0.8125rem; font-weight: 600;"></span>
-            </div>
+          <div class="form-group">
+            <label class="form-label">Nueva Clave de Soporte</label>
+            <input type="password" id="newPinInput" class="form-input" maxlength="8" placeholder="Nuevo PIN (mín. 4 dígitos)" />
           </div>
+
+          <div class="form-group">
+            <label class="form-label">Confirmar Nueva Clave</label>
+            <input type="password" id="confirmPinInput" class="form-input" maxlength="8" placeholder="Repita el PIN" />
+          </div>
+
+          <div style="margin-top: 0.5rem;">
+            <button class="btn btn-primary btn-sm" id="savePinBtn">Actualizar Clave</button>
+            <div id="pinUpdateMsg" style="font-size: 0.75rem; margin-top: 0.5rem; font-weight: 600;"></div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Logs -->
+        <div class="tab-content" id="tabContent-logs">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Eventos recientes</span>
+            <button class="btn btn-outline btn-sm" id="clearLogBtn" style="height: 1.75rem; padding: 0 0.5rem;">Limpiar</button>
+          </div>
+          <div class="terminal-box" id="activityLog"></div>
         </div>
       </section>
     </main>
 
-    <!-- Modal de Desbloqueo PIN (Diseño Idéntico al Login) -->
+    <!-- Modal de Desbloqueo PIN (Discreto y Seguro) -->
     <div class="modal-backdrop" id="pinModal">
       <div class="modal-card">
-        <div class="modal-logo-badge">
-          <img src="../assets/sobifruits.webp" alt="Sobifruits" />
+        <div class="modal-lock-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
         </div>
         <h2 class="modal-title">Acceso Técnico</h2>
-        <div class="modal-subtitle">Sobifruits S.A.C.</div>
-        <p class="modal-desc">Ingrese el PIN de seguridad para acceder a las herramientas de calibración, simulación y diagnóstico de la balanza.</p>
+        <p class="modal-desc">Ingrese el PIN de seguridad para acceder a la configuración.</p>
 
         <form id="pinForm" onsubmit="event.preventDefault(); handlePinSubmit();">
           <input
@@ -1070,20 +715,21 @@
           <div class="pin-error-msg" id="pinError"></div>
 
           <div class="modal-actions">
-            <button type="button" class="btn btn-outline" id="pinCancelBtn">Cancelar</button>
-            <button type="submit" class="btn btn-primary" id="pinSubmitBtn">Acceder</button>
+            <button type="button" class="btn btn-outline btn-sm" id="pinCancelBtn">Cancelar</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="pinSubmitBtn">Ingresar</button>
           </div>
         </form>
-
-        <div class="pin-hint">PIN por defecto: <strong>1234</strong></div>
       </div>
     </div>
 
-    <!-- App Footer -->
-    <footer class="app-footer">
-      <div>Servicio de Captura de Peso • <strong>Sobifruits S.A.C.</strong></div>
-      <div>Puerto HTTP: <strong>8080</strong> • PIN Soporte: <strong>1234</strong></div>
-    </footer>
+    <!-- Hidden elements for script compatibility -->
+    <div style="display: none;">
+      <span id="versionLabel">1.0.0</span>
+      <div id="httpServerStatus"></div>
+      <div id="httpStatusText"></div>
+      <span id="modeToggleText"></span>
+      <div id="clientsList"></div>
+    </div>
 
     <script src="renderer.js"></script>
   </body>

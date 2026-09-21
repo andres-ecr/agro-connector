@@ -45,10 +45,14 @@ if (!gotTheLock) {
  */
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 860,
-    height: 680,
-    minWidth: 680,
-    minHeight: 520,
+    width: 400,
+    height: 600,
+    minWidth: 380,
+    minHeight: 560,
+    maxWidth: 480,
+    maxHeight: 680,
+    resizable: false,
+    backgroundColor: '#ffffff',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -59,11 +63,10 @@ function createMainWindow() {
       ? path.join(__dirname, 'assets/sobifruits.png')
       : path.join(__dirname, 'assets/logo.ico'),
     show: false,
-    resizable: true,
     minimizable: true,
-    maximizable: true,
+    maximizable: false,
     closable: true,
-    title: 'Conector de Balanza - Sobifruits',
+    title: 'Balanza - Sobifruits',
   });
 
   // Make main window globally accessible
