@@ -13,6 +13,7 @@ const {
   nativeImage,
 } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 
@@ -54,7 +55,9 @@ function createMainWindow() {
       enableRemoteModule: true,
     },
     autoHideMenuBar: true,
-    icon: path.join(__dirname, 'assets/logo.ico'),
+    icon: fs.existsSync(path.join(__dirname, 'assets/sobifruits.png'))
+      ? path.join(__dirname, 'assets/sobifruits.png')
+      : path.join(__dirname, 'assets/logo.ico'),
     show: false,
     resizable: true,
     minimizable: true,
@@ -96,7 +99,9 @@ function createMainWindow() {
  * Create system tray
  */
 function createTray() {
-  const iconPath = path.join(__dirname, 'assets/logo.ico');
+  const iconPath = fs.existsSync(path.join(__dirname, 'assets/sobifruits.png'))
+    ? path.join(__dirname, 'assets/sobifruits.png')
+    : path.join(__dirname, 'assets/logo.ico');
 
   try {
     const icon = nativeImage.createFromPath(iconPath);
