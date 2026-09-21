@@ -65,7 +65,7 @@ function createMainWindow() {
     minimizable: true,
     maximizable: true,
     closable: true,
-    title: 'Sistema de Conexión de Balanza - Sobifruits',
+    title: 'Sistema de Conexión de Balanza',
   });
 
   // Make main window globally accessible
