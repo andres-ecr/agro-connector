@@ -523,6 +523,9 @@ async function connectToSerial(explicitPort) {
       localStorage.setItem('sobifruits_saved_port', selectedPort);
     } else {
       addLogEntry('error', `Fallo de conexión en ${selectedPort}: ${result.error}`);
+      if (localStorage.getItem('sobifruits_saved_port') === selectedPort) {
+        localStorage.removeItem('sobifruits_saved_port');
+      }
       if (connectBtn) {
         connectBtn.disabled = false;
         connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
@@ -534,6 +537,9 @@ async function connectToSerial(explicitPort) {
     }
   } catch (err) {
     addLogEntry('error', `Error al conectar: ${err.message}`);
+    if (localStorage.getItem('sobifruits_saved_port') === selectedPort) {
+      localStorage.removeItem('sobifruits_saved_port');
+    }
     if (connectBtn) {
       connectBtn.disabled = false;
       connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
@@ -614,17 +620,18 @@ function populateSerialPorts(ports) {
   const savedPort = localStorage.getItem('sobifruits_saved_port');
   let chosenPort = null;
 
-  if (savedPort && ports.some((p) => p.path === savedPort)) {
+  if (savedPort && ports.some((p) => p.path === savedPort && p.isValid !== false)) {
     chosenPort = savedPort;
-  } else if (ports.length > 0) {
-    chosenPort = ports[0].path;
+  } else {
+    const validUsb = ports.find((p) => p.isUsb && p.isValid !== false);
+    const validAny = ports.find((p) => p.isValid !== false);
+    chosenPort = (validUsb || validAny)?.path || (ports.length > 0 ? ports[0].path : null);
   }
 
   if (chosenPort) {
     selects.forEach((select) => {
       select.value = chosenPort;
     });
-    localStorage.setItem('sobifruits_saved_port', chosenPort);
   }
 
   if (connectBtn) {
@@ -634,8 +641,9 @@ function populateSerialPorts(ports) {
     opConnectBtn.disabled = !chosenPort || serialConnected;
   }
 
-  // Auto-connect to detected scale port if not currently connected
-  if (!serialConnected && chosenPort) {
+  // Auto-connect to detected scale port if not currently connected and valid
+  const isCandidateValid = ports.find((p) => p.path === chosenPort)?.isValid !== false;
+  if (!serialConnected && chosenPort && isCandidateValid) {
     connectToSerial(chosenPort);
   }
 }

@@ -58,7 +58,7 @@ class HttpWeightServer {
     // Generic latest weight endpoint (default to truck-1 or first available)
     this.app.get('/api/weight', (req, res) => {
       const data = this.weightData['truck-1'] || Object.values(this.weightData)[0] || { value: 0, timestamp: new Date(), connected: false };
-      const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected) : Boolean(data.connected);
+      const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected || data.connected) : Boolean(data.connected);
       res.json({
         success: true,
         truckId: 'truck-1',
@@ -74,7 +74,7 @@ class HttpWeightServer {
       const data = this.weightData[truckId];
 
       if (data) {
-        const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected) : Boolean(data.connected);
+        const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected || data.connected) : Boolean(data.connected);
         res.json({
           success: true,
           truckId,
@@ -92,12 +92,12 @@ class HttpWeightServer {
 
     // Get all trucks' weight data
     this.app.get('/api/weights', (req, res) => {
-      const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected) : false;
       const trucksData = {};
       for (const [truckId, data] of Object.entries(this.weightData)) {
+        const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected || data.connected) : Boolean(data.connected);
         trucksData[truckId] = {
           ...data,
-          connected: this.serialManager ? isConnected : Boolean(data.connected),
+          connected: isConnected,
         };
       }
       res.json({
@@ -114,6 +114,7 @@ class HttpWeightServer {
           success: true,
           ports,
           currentPort: this.serialManager ? this.serialManager.currentPort : null,
+          savedPort: this.serialManager ? this.serialManager.savedPort : null,
           connected: this.serialManager ? this.serialManager.isConnected : false,
         });
       } catch (err) {
@@ -172,12 +173,13 @@ class HttpWeightServer {
       const { weight } = req.body;
 
       if (this.weightData[truckId] !== undefined) {
-        this.updateWeight(truckId, weight);
+        this.updateWeight(truckId, weight, true);
         res.json({
           success: true,
           message: 'Weight updated',
           truckId,
           weight,
+          connected: true,
         });
       } else {
         res.status(404).json({
@@ -349,13 +351,14 @@ class HttpWeightServer {
   }
 
   // Update weight data for a truck
-  updateWeight(truckId, value) {
+  updateWeight(truckId, value, isSimulated = false) {
     if (this.weightData[truckId] !== undefined) {
       const numericValue = parseFloat(value);
+      const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected || isSimulated) : true;
       this.weightData[truckId] = {
         value: numericValue,
         timestamp: new Date(),
-        connected: this.serialManager ? Boolean(this.serialManager.isConnected) : true,
+        connected: isConnected,
       };
 
       if (config.development.enableDebugLogging) {

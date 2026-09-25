@@ -225,6 +225,8 @@ async function initializeApp() {
     // Initialize serial manager
     serialManager = new SerialManager();
     serialManager.setAutoReconnect(true);
+    serialManager.startAutoScan(4000); // Continuous background scan for scale plug-in
+    serialManager.autoConnect(); // Immediate initial auto-connect attempt
 
     // Initialize HTTP weight server
     httpWeightServer = new HttpWeightServer({ serialManager });
@@ -325,6 +327,7 @@ app.on('before-quit', async () => {
 
   // Cleanup
   if (serialManager) {
+    serialManager.stopAutoScan();
     await serialManager.disconnect();
   }
 
@@ -339,9 +342,10 @@ ipcMain.handle('simulate-weight', async (event, weight) => {
     throw new Error('HTTP weight server not initialized');
   }
 
-  // Send to truck-1 by default, can be made configurable
-  httpWeightServer.updateWeight('truck-1', weight);
-  console.log(`Manual weight simulated: ${weight}kg for truck-1`);
+  // Send to truck-1 and truck-2
+  httpWeightServer.updateWeight('truck-1', weight, true);
+  httpWeightServer.updateWeight('truck-2', weight, true);
+  console.log(`Manual weight simulated: ${weight}kg`);
 
   return { success: true, weight, truckId: 'truck-1' };
 });
@@ -380,6 +384,7 @@ ipcMain.handle('get-app-status', () => {
     serial: {
       connected: serialManager ? serialManager.isConnected : false,
       port: serialManager ? serialManager.currentPort : null,
+      savedPort: serialManager ? serialManager.savedPort : null,
     },
     httpServer: {
       running: httpWeightServer ? true : false,

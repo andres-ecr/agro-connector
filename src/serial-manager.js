@@ -1,6 +1,20 @@
+const fs = require('fs');
+const path = require('path');
 const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { EventEmitter } = require('events');
+
+function getConfigFilePath() {
+  try {
+    const { app } = require('electron');
+    if (app && app.getPath) {
+      return path.join(app.getPath('userData'), 'serial-config.json');
+    }
+  } catch (e) {
+    // ignore
+  }
+  return path.join(process.cwd(), 'serial-config.json');
+}
 
 class SerialManager extends EventEmitter {
   constructor() {
@@ -10,8 +24,10 @@ class SerialManager extends EventEmitter {
     this.availablePorts = [];
     this.isConnected = false;
     this.currentPort = null;
+    this.savedPort = null;
     this.autoReconnect = true;
     this.reconnectInterval = null;
+    this.autoScanTimer = null;
     this.lastWeight = null;
     this.debugMode = false;
     this.connectionSettings = {
@@ -21,14 +37,68 @@ class SerialManager extends EventEmitter {
       parity: 'none',
       autoOpen: false,
     };
+
+    this.loadConfig();
   }
 
   /**
-   * List all available serial ports
+   * Load saved serial configuration
+   */
+  loadConfig() {
+    try {
+      const cfgPath = getConfigFilePath();
+      if (fs.existsSync(cfgPath)) {
+        const raw = fs.readFileSync(cfgPath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed.lastPort) this.savedPort = parsed.lastPort;
+        if (parsed.baudRate) this.connectionSettings.baudRate = parsed.baudRate;
+        console.log(`Loaded serial config: lastPort=${this.savedPort}`);
+      }
+    } catch (e) {
+      console.warn('Could not read serial-config.json:', e.message);
+    }
+  }
+
+  /**
+   * Persist current port configuration
+   */
+  saveConfig() {
+    try {
+      const cfgPath = getConfigFilePath();
+      const data = {
+        lastPort: this.savedPort || this.currentPort,
+        baudRate: this.connectionSettings.baudRate,
+      };
+      fs.writeFileSync(cfgPath, JSON.stringify(data, null, 2), 'utf8');
+      console.log(`Saved serial config: lastPort=${data.lastPort}`);
+    } catch (e) {
+      console.warn('Could not save serial-config.json:', e.message);
+    }
+  }
+
+  /**
+   * List all available serial ports with USB detection and validity check
    */
   async listPorts() {
     try {
-      this.availablePorts = await SerialPort.list();
+      const rawPorts = await SerialPort.list();
+      this.availablePorts = rawPorts.map((p) => {
+        const isAcpiErrorPort =
+          (p.pnpId && p.pnpId.includes('ACPI\\PNP0501')) ||
+          (p.path === 'COM1' && /standard/i.test(p.manufacturer || ''));
+        const isUsb = Boolean(
+          (p.pnpId && p.pnpId.toUpperCase().includes('USB')) ||
+          p.vendorId ||
+          /usb|ch34|ftdi|pl2303|cp210|prolific|silicon/i.test(p.friendlyName || p.manufacturer || '')
+        );
+
+        return {
+          ...p,
+          isUsb,
+          isAcpiErrorPort,
+          isValid: !isAcpiErrorPort,
+        };
+      });
       return this.availablePorts;
     } catch (error) {
       console.error('Error listing ports:', error);
@@ -60,6 +130,8 @@ class SerialManager extends EventEmitter {
       this.port.on('open', () => {
         this.isConnected = true;
         this.currentPort = portPath;
+        this.savedPort = portPath;
+        this.saveConfig();
         this.emit('connected', portPath);
         console.log(`Connected to port ${portPath}`);
       });
@@ -121,6 +193,71 @@ class SerialManager extends EventEmitter {
       console.error('Error connecting:', error);
       this.emit('error', `Error connecting: ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * Automatically detect and connect to available scale port
+   */
+  async autoConnect() {
+    if (this.isConnected) return true;
+
+    try {
+      const ports = await this.listPorts();
+      if (!ports || ports.length === 0) return false;
+
+      // 1. Try saved port if it's currently present and valid
+      if (this.savedPort) {
+        const matching = ports.find((p) => p.path === this.savedPort);
+        if (matching && matching.isValid) {
+          console.log(`Auto-connecting to saved port: ${this.savedPort}`);
+          const ok = await this.connect(this.savedPort);
+          if (ok) return true;
+        }
+      }
+
+      // 2. Try any valid USB-Serial ports
+      const usbPorts = ports.filter((p) => p.isUsb && p.isValid);
+      for (const p of usbPorts) {
+        console.log(`Auto-connecting to detected USB port: ${p.path}`);
+        const ok = await this.connect(p.path);
+        if (ok) return true;
+      }
+
+      // 3. Try any other valid non-ACPI ports
+      const otherValid = ports.filter((p) => p.isValid && !p.isUsb);
+      for (const p of otherValid) {
+        console.log(`Auto-connecting to candidate port: ${p.path}`);
+        const ok = await this.connect(p.path);
+        if (ok) return true;
+      }
+
+      return false;
+    } catch (err) {
+      console.error('Error during auto-connect:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Start background scan timer for auto-connection on plug-in
+   */
+  startAutoScan(intervalMs = 4000) {
+    if (this.autoScanTimer) clearInterval(this.autoScanTimer);
+    this.autoScanTimer = setInterval(async () => {
+      if (!this.isConnected && this.autoReconnect) {
+        await this.autoConnect();
+      }
+    }, intervalMs);
+  }
+
+  /**
+   * Stop background scan timer
+   */
+  stopAutoScan() {
+    if (this.autoScanTimer) {
+      clearInterval(this.autoScanTimer);
+      this.autoScanTimer = null;
     }
   }
 
@@ -348,6 +485,7 @@ class SerialManager extends EventEmitter {
     return {
       connected: this.isConnected,
       port: this.currentPort,
+      savedPort: this.savedPort,
       autoReconnect: this.autoReconnect,
       debugMode: this.debugMode,
       lastWeight: this.lastWeight,
