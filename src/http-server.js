@@ -186,6 +186,136 @@ class HttpWeightServer {
         });
       }
     });
+
+    // List available printers (auto-detects Zebra / ZDesigner)
+    this.app.get('/api/printers', async (req, res) => {
+      try {
+        const { BrowserWindow } = require('electron');
+        const win = BrowserWindow.getAllWindows()[0];
+        if (win && win.webContents) {
+          const printers = await win.webContents.getPrintersAsync();
+          return res.json({
+            success: true,
+            printers: printers.map((p) => ({
+              name: p.name,
+              displayName: p.displayName || p.name,
+              isDefault: p.isDefault,
+              isZebra: /zebra|zdesigner/i.test(p.name || ''),
+              status: p.status,
+            })),
+          });
+        }
+        res.json({ success: true, printers: [] });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // Print label to Zebra or default printer
+    this.app.post('/api/print/label', async (req, res) => {
+      try {
+        const { imageBase64, printerName, registro, datosGenerales } = req.body;
+        if (!imageBase64) {
+          return res.status(400).json({ success: false, error: 'Se requiere imageBase64' });
+        }
+
+        const { BrowserWindow, app } = require('electron');
+        const path = require('path');
+        const fs = require('fs');
+
+        // Guardar respaldo de la ficha en Documents/SobiFruits_Fichas (igual que software anterior)
+        try {
+          const documentsPath = app.getPath('documents');
+          const outputDir = path.join(documentsPath, 'SobiFruits_Fichas');
+          if (!fs.existsSync(outputDir)) {
+            fs.mkdirSync(outputDir, { recursive: true });
+          }
+          const cargaStr = datosGenerales?.carga || datosGenerales?.lote || 'SinCarga';
+          const fileName = `Ficha_${cargaStr}_${new Date().toISOString().split('T')[0]}_Jaba${registro?.jabas || '0'}.png`;
+          const filePath = path.join(outputDir, fileName);
+          const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+          fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+        } catch (saveErr) {
+          console.warn('Advertencia al guardar respaldo de imagen de ficha:', saveErr);
+        }
+
+        // Buscar impresora Zebra automáticamente si no se especificó
+        let targetPrinter = printerName;
+        const mainWin = BrowserWindow.getAllWindows()[0];
+        if (!targetPrinter && mainWin && mainWin.webContents) {
+          try {
+            const printers = await mainWin.webContents.getPrintersAsync();
+            const zebraPrinter = printers.find((p) => /zebra|zdesigner/i.test(p.name || ''));
+            if (zebraPrinter) {
+              targetPrinter = zebraPrinter.name;
+            }
+          } catch (e) {
+            console.warn('No se pudo listar impresoras para autodetección:', e);
+          }
+        }
+
+        // Crear ventana offscreen para imprimir
+        const printWin = new BrowserWindow({
+          show: false,
+          width: 680,
+          height: 490,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+          },
+        });
+
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              @page { size: 100mm 75mm; margin: 0; }
+              body { margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; background: white; }
+              img { width: 100%; height: 100%; object-fit: contain; display: block; }
+            </style>
+          </head>
+          <body>
+            <img src="${imageBase64}" />
+          </body>
+          </html>
+        `;
+
+        await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+
+        const printOptions = {
+          silent: true,
+          printBackground: true,
+          margins: { marginType: 'none' },
+          pageSize: { width: 100000, height: 75000 },
+        };
+
+        if (targetPrinter) {
+          printOptions.deviceName = targetPrinter;
+        }
+
+        printWin.webContents.print(printOptions, (success, failureReason) => {
+          printWin.close();
+          if (success) {
+            res.json({
+              success: true,
+              message: targetPrinter
+                ? `Etiqueta impresa en ${targetPrinter}`
+                : 'Etiqueta enviada a la impresora predeterminada',
+              printer: targetPrinter,
+            });
+          } else {
+            res.status(500).json({
+              success: false,
+              error: `Error al imprimir: ${failureReason}`,
+            });
+          }
+        });
+      } catch (err) {
+        console.error('Error en /api/print/label:', err);
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
   }
 
   start() {
