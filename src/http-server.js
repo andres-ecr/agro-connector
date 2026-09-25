@@ -58,12 +58,13 @@ class HttpWeightServer {
     // Generic latest weight endpoint (default to truck-1 or first available)
     this.app.get('/api/weight', (req, res) => {
       const data = this.weightData['truck-1'] || Object.values(this.weightData)[0] || { value: 0, timestamp: new Date(), connected: false };
+      const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected) : Boolean(data.connected);
       res.json({
         success: true,
         truckId: 'truck-1',
         weight: data.value,
         timestamp: data.timestamp,
-        connected: data.connected,
+        connected: isConnected,
       });
     });
 
@@ -73,12 +74,13 @@ class HttpWeightServer {
       const data = this.weightData[truckId];
 
       if (data) {
+        const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected) : Boolean(data.connected);
         res.json({
           success: true,
           truckId,
           weight: data.value,
           timestamp: data.timestamp,
-          connected: data.connected,
+          connected: isConnected,
         });
       } else {
         res.status(404).json({
@@ -90,9 +92,17 @@ class HttpWeightServer {
 
     // Get all trucks' weight data
     this.app.get('/api/weights', (req, res) => {
+      const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected) : false;
+      const trucksData = {};
+      for (const [truckId, data] of Object.entries(this.weightData)) {
+        trucksData[truckId] = {
+          ...data,
+          connected: this.serialManager ? isConnected : Boolean(data.connected),
+        };
+      }
       res.json({
         success: true,
-        trucks: this.weightData,
+        trucks: trucksData,
       });
     });
 
@@ -215,7 +225,7 @@ class HttpWeightServer {
       this.weightData[truckId] = {
         value: numericValue,
         timestamp: new Date(),
-        connected: true,
+        connected: this.serialManager ? Boolean(this.serialManager.isConnected) : true,
       };
 
       if (config.development.enableDebugLogging) {
