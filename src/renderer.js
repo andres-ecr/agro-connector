@@ -16,7 +16,14 @@ let logEntries = [];
 let weightValueEl, weightMetaEl;
 let serialStatusEl, serialStatusTextEl;
 let httpServerStatusEl, httpStatusTextEl;
+
+// Support View Connection Controls
 let serialPortSelect, refreshPortsBtn, connectBtn, disconnectBtn;
+
+// Operator View Direct Connection Controls
+let opSerialPortSelect, opRefreshPortsBtn, opConnectBtn, opDisconnectBtn;
+
+// Support / Diagnostic elements
 let testWeightInput, sendTestWeightBtn;
 let clientCountEl, clientsListEl, httpServerInfoEl;
 let activityLogEl, clearLogBtn;
@@ -52,7 +59,13 @@ function initializeElements() {
   httpServerStatusEl = document.getElementById('httpServerStatus');
   httpStatusTextEl = document.getElementById('httpStatusText');
 
-  // Connection controls
+  // Operator view controls
+  opSerialPortSelect = document.getElementById('opSerialPort');
+  opRefreshPortsBtn = document.getElementById('opRefreshPortsBtn');
+  opConnectBtn = document.getElementById('opConnectBtn');
+  opDisconnectBtn = document.getElementById('opDisconnectBtn');
+
+  // Support view connection controls
   serialPortSelect = document.getElementById('serialPort');
   refreshPortsBtn = document.getElementById('refreshPortsBtn');
   connectBtn = document.getElementById('connectBtn');
@@ -153,19 +166,43 @@ function setupEventListeners() {
     }
   });
 
-  // Port selector change
-  serialPortSelect.addEventListener('change', () => {
-    const hasPort = Boolean(serialPortSelect.value);
-    connectBtn.disabled = !hasPort || serialConnected;
-    if (hasPort) {
-      localStorage.setItem('sobifruits_saved_port', serialPortSelect.value);
-    }
-  });
+  // Sync operator port selector change
+  if (opSerialPortSelect) {
+    opSerialPortSelect.addEventListener('change', () => {
+      const val = opSerialPortSelect.value;
+      if (serialPortSelect) serialPortSelect.value = val;
+      const hasPort = Boolean(val);
+      if (opConnectBtn) opConnectBtn.disabled = !hasPort || serialConnected;
+      if (connectBtn) connectBtn.disabled = !hasPort || serialConnected;
+      if (hasPort) {
+        localStorage.setItem('sobifruits_saved_port', val);
+      }
+    });
+  }
 
-  // Connection buttons
-  connectBtn.addEventListener('click', connectToSerial);
-  disconnectBtn.addEventListener('click', disconnectFromSerial);
-  refreshPortsBtn.addEventListener('click', refreshSerialPorts);
+  // Sync support port selector change
+  if (serialPortSelect) {
+    serialPortSelect.addEventListener('change', () => {
+      const val = serialPortSelect.value;
+      if (opSerialPortSelect) opSerialPortSelect.value = val;
+      const hasPort = Boolean(val);
+      if (opConnectBtn) opConnectBtn.disabled = !hasPort || serialConnected;
+      if (connectBtn) connectBtn.disabled = !hasPort || serialConnected;
+      if (hasPort) {
+        localStorage.setItem('sobifruits_saved_port', val);
+      }
+    });
+  }
+
+  // Connection buttons (Operator View)
+  if (opConnectBtn) opConnectBtn.addEventListener('click', () => connectToSerial());
+  if (opDisconnectBtn) opDisconnectBtn.addEventListener('click', disconnectFromSerial);
+  if (opRefreshPortsBtn) opRefreshPortsBtn.addEventListener('click', refreshSerialPorts);
+
+  // Connection buttons (Support View)
+  if (connectBtn) connectBtn.addEventListener('click', () => connectToSerial());
+  if (disconnectBtn) disconnectBtn.addEventListener('click', disconnectFromSerial);
+  if (refreshPortsBtn) refreshPortsBtn.addEventListener('click', refreshSerialPorts);
 
   // Test weight emit
   if (sendTestWeightBtn) {
@@ -233,11 +270,9 @@ function setupTabNavigation() {
     tab.addEventListener('click', () => {
       const target = tab.dataset.tab;
 
-      // Update active tab button
       tabs.forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
 
-      // Update active content
       document.querySelectorAll('.tab-content').forEach((content) => {
         content.classList.remove('active');
       });
@@ -342,16 +377,6 @@ async function initializeData() {
 
     await refreshSerialPorts();
 
-    // Auto-select saved port if available
-    const savedPort = localStorage.getItem('sobifruits_saved_port');
-    if (savedPort && serialPortSelect) {
-      const match = Array.from(serialPortSelect.options).find((opt) => opt.value === savedPort);
-      if (match) {
-        serialPortSelect.value = savedPort;
-        connectBtn.disabled = serialConnected;
-      }
-    }
-
     addLogEntry('success', 'Conector de balanza inicializado correctamente.');
   } catch (error) {
     addLogEntry('error', `Error de inicio: ${error.message}`);
@@ -396,23 +421,43 @@ function updateSerialStatus(status) {
 
   if (serialConnected) {
     if (serialStatusEl) serialStatusEl.className = 'status-badge connected';
-    if (serialStatusTextEl) serialStatusTextEl.textContent = 'Balanza Conectada';
+    if (serialStatusTextEl) {
+      serialStatusTextEl.textContent = currentPortPath ? `Balanza Conectada (${currentPortPath})` : 'Balanza Conectada';
+    }
+
     if (connectBtn) connectBtn.style.display = 'none';
     if (disconnectBtn) {
       disconnectBtn.style.display = 'inline-flex';
       disconnectBtn.disabled = false;
     }
+
+    if (opConnectBtn) opConnectBtn.style.display = 'none';
+    if (opDisconnectBtn) {
+      opDisconnectBtn.style.display = 'inline-flex';
+      opDisconnectBtn.disabled = false;
+    }
+
     if (weightMetaEl) {
       weightMetaEl.textContent = 'Transmitiendo en vivo al ERP';
     }
   } else {
     if (serialStatusEl) serialStatusEl.className = 'status-badge disconnected';
     if (serialStatusTextEl) serialStatusTextEl.textContent = 'Buscando balanza...';
+
     if (disconnectBtn) disconnectBtn.style.display = 'none';
     if (connectBtn) {
       connectBtn.style.display = 'inline-flex';
       connectBtn.disabled = !serialPortSelect || !serialPortSelect.value;
+      connectBtn.innerHTML = 'Conectar Balanza';
     }
+
+    if (opDisconnectBtn) opDisconnectBtn.style.display = 'none';
+    if (opConnectBtn) {
+      opConnectBtn.style.display = 'inline-flex';
+      opConnectBtn.disabled = !opSerialPortSelect || !opSerialPortSelect.value;
+      opConnectBtn.innerHTML = 'Conectar';
+    }
+
     if (weightMetaEl) {
       weightMetaEl.textContent = 'Esperando conexión de balanza';
     }
@@ -458,24 +503,33 @@ async function updateClientsCount() {
 /**
  * Serial connection actions
  */
-async function connectToSerial() {
-  if (!serialPortSelect || !serialPortSelect.value) return;
-  const selectedPort = serialPortSelect.value;
+async function connectToSerial(explicitPort) {
+  const selectedPort = explicitPort || opSerialPortSelect?.value || serialPortSelect?.value;
+  if (!selectedPort) return;
 
   if (connectBtn) {
     connectBtn.disabled = true;
     connectBtn.innerHTML = `<span>Conectando...</span>`;
+  }
+  if (opConnectBtn) {
+    opConnectBtn.disabled = true;
+    opConnectBtn.innerHTML = `<span>Conectando...</span>`;
   }
 
   try {
     const result = await ipcRenderer.invoke('connect-serial-port', selectedPort);
     if (result.success) {
       addLogEntry('success', `Conectado al puerto ${selectedPort}`);
+      localStorage.setItem('sobifruits_saved_port', selectedPort);
     } else {
-      addLogEntry('error', `Fallo de conexión: ${result.error}`);
+      addLogEntry('error', `Fallo de conexión en ${selectedPort}: ${result.error}`);
       if (connectBtn) {
         connectBtn.disabled = false;
         connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
+      }
+      if (opConnectBtn) {
+        opConnectBtn.disabled = false;
+        opConnectBtn.innerHTML = `<span>Conectar</span>`;
       }
     }
   } catch (err) {
@@ -484,6 +538,10 @@ async function connectToSerial() {
       connectBtn.disabled = false;
       connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
     }
+    if (opConnectBtn) {
+      opConnectBtn.disabled = false;
+      opConnectBtn.innerHTML = `<span>Conectar</span>`;
+    }
   }
 }
 
@@ -491,6 +549,10 @@ async function disconnectFromSerial() {
   if (disconnectBtn) {
     disconnectBtn.disabled = true;
     disconnectBtn.innerHTML = `<span>Desconectando...</span>`;
+  }
+  if (opDisconnectBtn) {
+    opDisconnectBtn.disabled = true;
+    opDisconnectBtn.innerHTML = `<span>Desconectando...</span>`;
   }
 
   try {
@@ -507,11 +569,16 @@ async function disconnectFromSerial() {
       disconnectBtn.disabled = false;
       disconnectBtn.innerHTML = `<span>Desconectar</span>`;
     }
+    if (opDisconnectBtn) {
+      opDisconnectBtn.disabled = false;
+      opDisconnectBtn.innerHTML = `<span>Desconectar</span>`;
+    }
   }
 }
 
 async function refreshSerialPorts() {
   if (refreshPortsBtn) refreshPortsBtn.disabled = true;
+  if (opRefreshPortsBtn) opRefreshPortsBtn.disabled = true;
 
   try {
     const result = await ipcRenderer.invoke('list-serial-ports');
@@ -525,36 +592,51 @@ async function refreshSerialPorts() {
     addLogEntry('error', `Error al refrescar puertos: ${err.message}`);
   } finally {
     if (refreshPortsBtn) refreshPortsBtn.disabled = false;
+    if (opRefreshPortsBtn) opRefreshPortsBtn.disabled = false;
   }
 }
 
 function populateSerialPorts(ports) {
-  if (!serialPortSelect) return;
-  serialPortSelect.innerHTML = '<option value="">Seleccione un puerto...</option>';
+  const selects = [serialPortSelect, opSerialPortSelect].filter(Boolean);
+  if (selects.length === 0) return;
 
-  ports.forEach((port) => {
-    const option = document.createElement('option');
-    option.value = port.path;
-    const label = port.friendlyName || port.manufacturer ? `${port.path} (${port.friendlyName || port.manufacturer})` : port.path;
-    option.textContent = label;
-    serialPortSelect.appendChild(option);
+  selects.forEach((select) => {
+    select.innerHTML = '<option value="">Seleccione un puerto...</option>';
+    ports.forEach((port) => {
+      const option = document.createElement('option');
+      option.value = port.path;
+      const label = port.friendlyName || port.manufacturer ? `${port.path} (${port.friendlyName || port.manufacturer})` : port.path;
+      option.textContent = label;
+      select.appendChild(option);
+    });
   });
 
   const savedPort = localStorage.getItem('sobifruits_saved_port');
+  let chosenPort = null;
+
   if (savedPort && ports.some((p) => p.path === savedPort)) {
-    serialPortSelect.value = savedPort;
+    chosenPort = savedPort;
   } else if (ports.length > 0) {
-    serialPortSelect.value = ports[0].path;
-    localStorage.setItem('sobifruits_saved_port', ports[0].path);
+    chosenPort = ports[0].path;
+  }
+
+  if (chosenPort) {
+    selects.forEach((select) => {
+      select.value = chosenPort;
+    });
+    localStorage.setItem('sobifruits_saved_port', chosenPort);
   }
 
   if (connectBtn) {
-    connectBtn.disabled = !serialPortSelect.value || serialConnected;
+    connectBtn.disabled = !chosenPort || serialConnected;
+  }
+  if (opConnectBtn) {
+    opConnectBtn.disabled = !chosenPort || serialConnected;
   }
 
-  // Auto-connect to detected scale port in background
-  if (!serialConnected && serialPortSelect.value) {
-    connectToSerial();
+  // Auto-connect to detected scale port if not currently connected
+  if (!serialConnected && chosenPort) {
+    connectToSerial(chosenPort);
   }
 }
 
@@ -579,12 +661,12 @@ function updateLogDisplay() {
     .map((e) => {
       const tagClass = `log-tag-${e.level}`;
       return `
-        <div class="log-entry">
-          <span class="log-time">[${e.timestamp}]</span>
-          <span class="log-tag ${tagClass}">[${e.level.toUpperCase()}]</span>
-          <span class="log-msg">${e.message}</span>
-        </div>
-      `;
+      <div class="log-entry">
+        <span class="log-time">${e.timestamp}</span>
+        <span class="log-tag ${tagClass}">${e.level.toUpperCase()}</span>
+        <span class="log-msg">${escapeHtml(e.message)}</span>
+      </div>
+    `;
     })
     .join('');
 
@@ -594,6 +676,15 @@ function updateLogDisplay() {
 
 function clearLog() {
   logEntries = [];
-  if (activityLogEl) activityLogEl.innerHTML = '';
-  addLogEntry('info', 'Consola de registros limpia.');
+  if (activityLogEl) {
+    activityLogEl.innerHTML = '<div class="empty-log">Historial limpiado.</div>';
+  }
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

@@ -3,11 +3,12 @@ const cors = require('cors');
 const config = require('./config');
 
 class HttpWeightServer {
-  constructor() {
+  constructor(options = {}) {
     this.app = express();
     this.server = null;
     this.port = config.httpServer.port;
     this.host = config.httpServer.host;
+    this.serialManager = options.serialManager || null;
 
     // Store latest weight data for each truck
     this.weightData = {};
@@ -17,7 +18,7 @@ class HttpWeightServer {
       this.weightData[truckId] = {
         value: 0,
         timestamp: new Date(),
-        connected: true, // HTTP server is available, so consider it "connected"
+        connected: false,
       };
     });
 
@@ -29,6 +30,10 @@ class HttpWeightServer {
     }
 
     this.setupRoutes();
+  }
+
+  setSerialManager(serialManager) {
+    this.serialManager = serialManager;
   }
 
   setupRoutes() {
@@ -91,12 +96,63 @@ class HttpWeightServer {
       });
     });
 
+    // List available serial ports
+    this.app.get('/api/ports', async (req, res) => {
+      try {
+        const ports = this.serialManager ? await this.serialManager.listPorts() : [];
+        res.json({
+          success: true,
+          ports,
+          currentPort: this.serialManager ? this.serialManager.currentPort : null,
+          connected: this.serialManager ? this.serialManager.isConnected : false,
+        });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message, ports: [], connected: false });
+      }
+    });
+
+    // Connect to serial port
+    this.app.post('/api/ports/connect', async (req, res) => {
+      try {
+        const { port } = req.body;
+        if (!this.serialManager) {
+          return res.status(500).json({ success: false, error: 'Serial manager no inicializado' });
+        }
+        if (!port) {
+          return res.status(400).json({ success: false, error: 'Debe especificar el puerto' });
+        }
+        const success = await this.serialManager.connect(port);
+        res.json({
+          success,
+          port,
+          connected: this.serialManager.isConnected,
+        });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // Disconnect from serial port
+    this.app.post('/api/ports/disconnect', async (req, res) => {
+      try {
+        if (!this.serialManager) {
+          return res.status(500).json({ success: false, error: 'Serial manager no inicializado' });
+        }
+        const success = await this.serialManager.disconnect();
+        res.json({ success, connected: false });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
     // Health check
     this.app.get('/api/health', (req, res) => {
       res.json({
         success: true,
         message: 'Weight capture server is running',
         timestamp: new Date(),
+        serialConnected: this.serialManager ? this.serialManager.isConnected : false,
+        currentPort: this.serialManager ? this.serialManager.currentPort : null,
       });
     });
 
@@ -165,10 +221,6 @@ class HttpWeightServer {
       if (config.development.enableDebugLogging) {
         console.log(
           `Weight updated for ${truckId}: ${numericValue}kg at ${new Date().toLocaleTimeString()}`
-        );
-        console.log(
-          'Current weight data:',
-          JSON.stringify(this.weightData, null, 2)
         );
       } else {
         console.log(`Weight updated for ${truckId}: ${numericValue}kg`);

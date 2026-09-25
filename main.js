@@ -224,19 +224,19 @@ async function initializeApp() {
 
     // Initialize serial manager
     serialManager = new SerialManager();
+    serialManager.setAutoReconnect(true);
 
     // Initialize HTTP weight server
-    httpWeightServer = new HttpWeightServer();
+    httpWeightServer = new HttpWeightServer({ serialManager });
     await httpWeightServer.start();
 
     // Connect serial manager to HTTP server
     serialManager.on('weight', (data) => {
-      // Send to both trucks by default, or route based on configuration
-      const truckId = 'truck-1'; // Default to truck-1, can be made configurable
-
       if (httpWeightServer) {
-        httpWeightServer.updateWeight(truckId, data.value);
-        httpWeightServer.setConnectionStatus(truckId, true);
+        httpWeightServer.updateWeight('truck-1', data.value);
+        httpWeightServer.updateWeight('truck-2', data.value);
+        httpWeightServer.setConnectionStatus('truck-1', true);
+        httpWeightServer.setConnectionStatus('truck-2', true);
       }
 
       // Update main window
