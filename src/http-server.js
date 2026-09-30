@@ -65,6 +65,8 @@ class HttpWeightServer {
         weight: data.value,
         timestamp: data.timestamp,
         connected: isConnected,
+        port: this.serialManager ? this.serialManager.currentPort : null,
+        savedPort: this.serialManager ? this.serialManager.savedPort : null,
       });
     });
 
@@ -81,6 +83,8 @@ class HttpWeightServer {
           weight: data.value,
           timestamp: data.timestamp,
           connected: isConnected,
+          port: this.serialManager ? this.serialManager.currentPort : null,
+          savedPort: this.serialManager ? this.serialManager.savedPort : null,
         });
       } else {
         res.status(404).json({
@@ -98,11 +102,14 @@ class HttpWeightServer {
         trucksData[truckId] = {
           ...data,
           connected: isConnected,
+          port: this.serialManager ? this.serialManager.currentPort : null,
         };
       }
       res.json({
         success: true,
         trucks: trucksData,
+        currentPort: this.serialManager ? this.serialManager.currentPort : null,
+        connected: this.serialManager ? this.serialManager.isConnected : false,
       });
     });
 
@@ -132,6 +139,22 @@ class HttpWeightServer {
         if (!port) {
           return res.status(400).json({ success: false, error: 'Debe especificar el puerto' });
         }
+
+        // Fast-path: If already connected to this port, return success immediately
+        if (
+          this.serialManager.isConnected &&
+          this.serialManager.currentPort === port &&
+          this.serialManager.port &&
+          this.serialManager.port.isOpen
+        ) {
+          return res.json({
+            success: true,
+            port,
+            connected: true,
+            alreadyConnected: true,
+          });
+        }
+
         const success = await this.serialManager.connect(port);
         res.json({
           success,

@@ -82,23 +82,30 @@ class SerialManager extends EventEmitter {
   async listPorts() {
     try {
       const rawPorts = await SerialPort.list();
-      this.availablePorts = rawPorts.map((p) => {
-        const isAcpiErrorPort =
-          (p.pnpId && p.pnpId.includes('ACPI\\PNP0501')) ||
-          (p.path === 'COM1' && /standard/i.test(p.manufacturer || ''));
-        const isUsb = Boolean(
-          (p.pnpId && p.pnpId.toUpperCase().includes('USB')) ||
-          p.vendorId ||
-          /usb|ch34|ftdi|pl2303|cp210|prolific|silicon/i.test(p.friendlyName || p.manufacturer || '')
-        );
+      this.availablePorts = rawPorts
+        .map((p) => {
+          const isAcpiErrorPort =
+            (p.pnpId && p.pnpId.includes('ACPI\\PNP0501')) ||
+            (p.path === 'COM1' && /standard/i.test(p.manufacturer || ''));
+          const isUsb = Boolean(
+            (p.pnpId && p.pnpId.toUpperCase().includes('USB')) ||
+            p.vendorId ||
+            /usb|ch34|ftdi|pl2303|cp210|prolific|silicon/i.test(p.friendlyName || p.manufacturer || '')
+          );
 
-        return {
-          ...p,
-          isUsb,
-          isAcpiErrorPort,
-          isValid: !isAcpiErrorPort,
-        };
-      });
+          return {
+            ...p,
+            isUsb,
+            isAcpiErrorPort,
+            isValid: !isAcpiErrorPort,
+          };
+        })
+        .sort((a, b) => {
+          // Rank USB ports first, valid ports second, ACPI/invalid last
+          if (a.isUsb !== b.isUsb) return b.isUsb ? 1 : -1;
+          if (a.isValid !== b.isValid) return b.isValid ? 1 : -1;
+          return (a.path || '').localeCompare(b.path || '', undefined, { numeric: true });
+        });
       return this.availablePorts;
     } catch (error) {
       console.error('Error listing ports:', error);
@@ -112,8 +119,17 @@ class SerialManager extends EventEmitter {
    */
   async connect(portPath) {
     try {
+      // Idempotency: If already connected to this exact port and it is open, keep it open!
+      if (this.isConnected && this.currentPort === portPath && this.port && this.port.isOpen) {
+        console.log(`Port ${portPath} is already connected and open.`);
+        this.emit('connected', portPath);
+        return true;
+      }
+
       if (this.isConnected) {
         await this.disconnect();
+        // Give Windows OS serial driver time to release the COM handle
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
       console.log(`Attempting to connect to port: ${portPath}`);
