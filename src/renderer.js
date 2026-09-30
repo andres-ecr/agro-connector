@@ -612,12 +612,27 @@ function populateSerialPorts(ports) {
   const selects = [serialPortSelect, opSerialPortSelect].filter(Boolean);
   if (selects.length === 0) return;
 
+  // Filter out any virtual Bluetooth ports just in case
+  const cleanPorts = (ports || []).filter(
+    (p) => !/bluetooth|bth|v[íi]nculo bluetooth/i.test(p.friendlyName || p.manufacturer || '')
+  );
+
+  cleanPorts.sort((a, b) => {
+    if (Boolean(a.isUsb) !== Boolean(b.isUsb)) return a.isUsb ? -1 : 1;
+    const numA = parseInt((a.path || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt((b.path || '').replace(/\D/g, ''), 10) || 0;
+    return numA - numB;
+  });
+
   selects.forEach((select) => {
     select.innerHTML = '<option value="">Seleccione un puerto...</option>';
-    ports.forEach((port) => {
+    cleanPorts.forEach((port) => {
       const option = document.createElement('option');
       option.value = port.path;
-      const label = port.friendlyName || port.manufacturer ? `${port.path} (${port.friendlyName || port.manufacturer})` : port.path;
+      const tag = port.isUsb ? ' ★ USB' : '';
+      const label = port.friendlyName || port.manufacturer
+        ? `${port.path} (${port.friendlyName || port.manufacturer})${tag}`
+        : `${port.path}${tag}`;
       option.textContent = label;
       select.appendChild(option);
     });
@@ -626,14 +641,14 @@ function populateSerialPorts(ports) {
   const savedPort = localStorage.getItem('sobifruits_saved_port');
   let chosenPort = null;
 
-  if (serialConnected && currentPortPath && ports.some((p) => p.path === currentPortPath)) {
+  if (serialConnected && currentPortPath && cleanPorts.some((p) => p.path === currentPortPath)) {
     chosenPort = currentPortPath;
-  } else if (savedPort && ports.some((p) => p.path === savedPort && p.isValid !== false)) {
+  } else if (savedPort && cleanPorts.some((p) => p.path === savedPort && p.isValid !== false)) {
     chosenPort = savedPort;
   } else {
-    const validUsb = ports.find((p) => p.isUsb && p.isValid !== false);
-    const validAny = ports.find((p) => p.isValid !== false);
-    chosenPort = (validUsb || validAny)?.path || (ports.length > 0 ? ports[0].path : null);
+    const validUsb = cleanPorts.find((p) => p.isUsb && p.isValid !== false);
+    const validAny = cleanPorts.find((p) => p.isValid !== false);
+    chosenPort = (validUsb || validAny)?.path || (cleanPorts.length > 0 ? cleanPorts[0].path : null);
   }
 
   if (chosenPort) {

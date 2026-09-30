@@ -80,38 +80,46 @@ class SerialManager extends EventEmitter {
       console.warn(`[${this.channelId}] Could not save serial config:`, e.message);
     }
   }
-    }
-  }
 
   /**
-   * List all available serial ports with USB detection and validity check
+   * List all available serial ports with USB detection, Bluetooth exclusion, and validity check
    */
   async listPorts() {
     try {
       const rawPorts = await SerialPort.list();
       this.availablePorts = rawPorts
         .map((p) => {
+          const isBluetooth = Boolean(
+            /bluetooth|bth|v[íi]nculo bluetooth/i.test(p.friendlyName || p.manufacturer || '') ||
+            (p.pnpId && /bth|bluetooth/i.test(p.pnpId))
+          );
           const isAcpiErrorPort =
             (p.pnpId && p.pnpId.includes('ACPI\\PNP0501')) ||
             (p.path === 'COM1' && /standard/i.test(p.manufacturer || ''));
           const isUsb = Boolean(
-            (p.pnpId && p.pnpId.toUpperCase().includes('USB')) ||
-            p.vendorId ||
-            /usb|ch34|ftdi|pl2303|cp210|prolific|silicon/i.test(p.friendlyName || p.manufacturer || '')
+            !isBluetooth && (
+              /ch34|ftdi|pl2303|cp210|prolific|silicon|usb-serial|usb serial/i.test(p.friendlyName || p.manufacturer || '') ||
+              /1a86|0403|067b|10c4/i.test(p.vendorId || '') ||
+              (p.pnpId && p.pnpId.toUpperCase().includes('USB'))
+            )
           );
 
           return {
             ...p,
+            isBluetooth,
             isUsb,
             isAcpiErrorPort,
-            isValid: !isAcpiErrorPort,
+            isValid: !isAcpiErrorPort && !isBluetooth,
           };
         })
+        .filter((p) => !p.isBluetooth) // Strip virtual Bluetooth link ports completely
         .sort((a, b) => {
-          // Rank USB ports first, valid ports second, ACPI/invalid last
+          // Rank USB ports first, valid ports second
           if (a.isUsb !== b.isUsb) return b.isUsb ? 1 : -1;
           if (a.isValid !== b.isValid) return b.isValid ? 1 : -1;
-          return (a.path || '').localeCompare(b.path || '', undefined, { numeric: true });
+          const numA = parseInt((a.path || '').replace(/\D/g, ''), 10) || 0;
+          const numB = parseInt((b.path || '').replace(/\D/g, ''), 10) || 0;
+          return numA - numB;
         });
       return this.availablePorts;
     } catch (error) {
