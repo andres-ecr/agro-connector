@@ -425,6 +425,12 @@ function updateSerialStatus(status) {
       serialStatusTextEl.textContent = currentPortPath ? `Balanza Conectada (${currentPortPath})` : 'Balanza Conectada';
     }
 
+    // Keep dropdown selectors synchronized with the active connected port
+    if (currentPortPath) {
+      if (serialPortSelect) serialPortSelect.value = currentPortPath;
+      if (opSerialPortSelect) opSerialPortSelect.value = currentPortPath;
+    }
+
     if (connectBtn) connectBtn.style.display = 'none';
     if (disconnectBtn) {
       disconnectBtn.style.display = 'inline-flex';
@@ -442,7 +448,7 @@ function updateSerialStatus(status) {
     }
   } else {
     if (serialStatusEl) serialStatusEl.className = 'status-badge disconnected';
-    if (serialStatusTextEl) serialStatusTextEl.textContent = 'Buscando balanza...';
+    if (serialStatusTextEl) serialStatusTextEl.textContent = 'Balanza Desconectada';
 
     if (disconnectBtn) disconnectBtn.style.display = 'none';
     if (connectBtn) {
@@ -459,7 +465,7 @@ function updateSerialStatus(status) {
     }
 
     if (weightMetaEl) {
-      weightMetaEl.textContent = 'Esperando conexión de balanza';
+      weightMetaEl.textContent = 'Seleccione el puerto COM y presione Conectar';
     }
   }
 }
@@ -620,7 +626,9 @@ function populateSerialPorts(ports) {
   const savedPort = localStorage.getItem('sobifruits_saved_port');
   let chosenPort = null;
 
-  if (savedPort && ports.some((p) => p.path === savedPort && p.isValid !== false)) {
+  if (serialConnected && currentPortPath && ports.some((p) => p.path === currentPortPath)) {
+    chosenPort = currentPortPath;
+  } else if (savedPort && ports.some((p) => p.path === savedPort && p.isValid !== false)) {
     chosenPort = savedPort;
   } else {
     const validUsb = ports.find((p) => p.isUsb && p.isValid !== false);
@@ -639,12 +647,6 @@ function populateSerialPorts(ports) {
   }
   if (opConnectBtn) {
     opConnectBtn.disabled = !chosenPort || serialConnected;
-  }
-
-  // Auto-connect to detected scale port if not currently connected and valid
-  const isCandidateValid = ports.find((p) => p.path === chosenPort)?.isValid !== false;
-  if (!serialConnected && chosenPort && isCandidateValid) {
-    connectToSerial(chosenPort);
   }
 }
 

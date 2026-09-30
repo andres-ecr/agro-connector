@@ -25,7 +25,7 @@ class SerialManager extends EventEmitter {
     this.isConnected = false;
     this.currentPort = null;
     this.savedPort = null;
-    this.autoReconnect = true;
+    this.autoReconnect = false;
     this.reconnectInterval = null;
     this.autoScanTimer = null;
     this.lastWeight = null;

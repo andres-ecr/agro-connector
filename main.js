@@ -222,11 +222,10 @@ async function initializeApp() {
   try {
     console.log('Initializing Weight Capture Service...');
 
-    // Initialize serial manager
+    // Initialize serial manager (manual connection mode)
     serialManager = new SerialManager();
-    serialManager.setAutoReconnect(true);
-    serialManager.startAutoScan(4000); // Continuous background scan for scale plug-in
-    serialManager.autoConnect(); // Immediate initial auto-connect attempt
+    serialManager.setAutoReconnect(false);
+    // Background auto-scan and auto-connect are disabled - port connection is strictly manual from UI
 
     // Initialize HTTP weight server
     httpWeightServer = new HttpWeightServer({ serialManager });
