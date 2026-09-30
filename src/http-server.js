@@ -8,7 +8,8 @@ class HttpWeightServer {
     this.server = null;
     this.port = config.httpServer.port;
     this.host = config.httpServer.host;
-    this.serialManager = options.serialManager || null;
+    this.serialManagers = options.serialManagers || {};
+    this.serialManager = options.serialManager || this.serialManagers['truck-1'] || null;
 
     // Store latest weight data for each truck
     this.weightData = {};
@@ -32,8 +33,17 @@ class HttpWeightServer {
     this.setupRoutes();
   }
 
-  setSerialManager(serialManager) {
+  setSerialManager(serialManager, truckId = 'truck-1') {
+    if (!this.serialManagers) this.serialManagers = {};
+    this.serialManagers[truckId] = serialManager;
     this.serialManager = serialManager;
+  }
+
+  getSerialManager(truckId = 'truck-1') {
+    if (this.serialManagers && this.serialManagers[truckId]) {
+      return this.serialManagers[truckId];
+    }
+    return this.serialManager || null;
   }
 
   setupRoutes() {
@@ -58,15 +68,16 @@ class HttpWeightServer {
     // Generic latest weight endpoint (default to truck-1 or first available)
     this.app.get('/api/weight', (req, res) => {
       const data = this.weightData['truck-1'] || Object.values(this.weightData)[0] || { value: 0, timestamp: new Date(), connected: false };
-      const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected || data.connected) : Boolean(data.connected);
+      const mgr = this.getSerialManager('truck-1');
+      const isConnected = mgr ? Boolean(mgr.isConnected || data.connected) : Boolean(data.connected);
       res.json({
         success: true,
         truckId: 'truck-1',
         weight: data.value,
         timestamp: data.timestamp,
         connected: isConnected,
-        port: this.serialManager ? this.serialManager.currentPort : null,
-        savedPort: this.serialManager ? this.serialManager.savedPort : null,
+        port: mgr ? mgr.currentPort : null,
+        savedPort: mgr ? mgr.savedPort : null,
       });
     });
 
@@ -76,15 +87,16 @@ class HttpWeightServer {
       const data = this.weightData[truckId];
 
       if (data) {
-        const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected || data.connected) : Boolean(data.connected);
+        const mgr = this.getSerialManager(truckId);
+        const isConnected = mgr ? Boolean(mgr.isConnected || data.connected) : Boolean(data.connected);
         res.json({
           success: true,
           truckId,
           weight: data.value,
           timestamp: data.timestamp,
           connected: isConnected,
-          port: this.serialManager ? this.serialManager.currentPort : null,
-          savedPort: this.serialManager ? this.serialManager.savedPort : null,
+          port: mgr ? mgr.currentPort : null,
+          savedPort: mgr ? mgr.savedPort : null,
         });
       } else {
         res.status(404).json({
@@ -98,69 +110,98 @@ class HttpWeightServer {
     this.app.get('/api/weights', (req, res) => {
       const trucksData = {};
       for (const [truckId, data] of Object.entries(this.weightData)) {
-        const isConnected = this.serialManager ? Boolean(this.serialManager.isConnected || data.connected) : Boolean(data.connected);
+        const mgr = this.getSerialManager(truckId);
+        const isConnected = mgr ? Boolean(mgr.isConnected || data.connected) : Boolean(data.connected);
         trucksData[truckId] = {
           ...data,
           connected: isConnected,
-          port: this.serialManager ? this.serialManager.currentPort : null,
+          port: mgr ? mgr.currentPort : null,
         };
       }
       res.json({
         success: true,
         trucks: trucksData,
-        currentPort: this.serialManager ? this.serialManager.currentPort : null,
-        connected: this.serialManager ? this.serialManager.isConnected : false,
       });
     });
 
-    // List available serial ports
+    // List available serial ports with per-channel status
     this.app.get('/api/ports', async (req, res) => {
       try {
-        const ports = this.serialManager ? await this.serialManager.listPorts() : [];
+        const primaryMgr = this.getSerialManager('truck-1') || this.serialManager;
+        const ports = primaryMgr ? await primaryMgr.listPorts() : [];
+        const channels = {};
+        for (const truckId of config.weight.supportedTrucks) {
+          const mgr = this.getSerialManager(truckId);
+          channels[truckId] = {
+            currentPort: mgr ? mgr.currentPort : null,
+            savedPort: mgr ? mgr.savedPort : null,
+            connected: mgr ? mgr.isConnected : false,
+          };
+        }
+
         res.json({
           success: true,
           ports,
-          currentPort: this.serialManager ? this.serialManager.currentPort : null,
-          savedPort: this.serialManager ? this.serialManager.savedPort : null,
-          connected: this.serialManager ? this.serialManager.isConnected : false,
+          channels,
+          currentPort: primaryMgr ? primaryMgr.currentPort : null,
+          savedPort: primaryMgr ? primaryMgr.savedPort : null,
+          connected: primaryMgr ? primaryMgr.isConnected : false,
         });
       } catch (err) {
         res.status(500).json({ success: false, error: err.message, ports: [], connected: false });
       }
     });
 
-    // Connect to serial port
+    // Connect specific truck channel to serial port
     this.app.post('/api/ports/connect', async (req, res) => {
       try {
-        const { port } = req.body;
-        if (!this.serialManager) {
-          return res.status(500).json({ success: false, error: 'Serial manager no inicializado' });
+        const { port, truckId = 'truck-1' } = req.body;
+        const mgr = this.getSerialManager(truckId);
+        if (!mgr) {
+          return res.status(500).json({ success: false, error: `Serial manager para ${truckId} no inicializado` });
         }
         if (!port) {
           return res.status(400).json({ success: false, error: 'Debe especificar el puerto' });
         }
 
-        // Fast-path: If already connected to this port, return success immediately
+        // Fast-path: If already connected to this port on this channel, return success immediately
         if (
-          this.serialManager.isConnected &&
-          this.serialManager.currentPort === port &&
-          this.serialManager.port &&
-          this.serialManager.port.isOpen
+          mgr.isConnected &&
+          mgr.currentPort === port &&
+          mgr.port &&
+          mgr.port.isOpen
         ) {
           return res.json({
             success: true,
+            truckId,
             port,
             connected: true,
             alreadyConnected: true,
           });
         }
 
-        const success = await this.serialManager.connect(port);
+        const success = await mgr.connect(port);
         res.json({
           success,
+          truckId,
           port,
-          connected: this.serialManager.isConnected,
+          connected: mgr.isConnected,
         });
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    });
+
+    // Software reset of hardware control lines (DTR/RTS strobe)
+    this.app.post('/api/ports/reset', async (req, res) => {
+      try {
+        const { truckId = 'truck-1' } = req.body;
+        const mgr = this.getSerialManager(truckId);
+        if (!mgr) {
+          return res.status(500).json({ success: false, error: 'Serial manager no inicializado' });
+        }
+        const success = await mgr.resetHardware();
+        res.json({ success, truckId, port: mgr.currentPort });
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }
@@ -169,11 +210,13 @@ class HttpWeightServer {
     // Disconnect from serial port
     this.app.post('/api/ports/disconnect', async (req, res) => {
       try {
-        if (!this.serialManager) {
+        const { truckId = 'truck-1' } = req.body;
+        const mgr = this.getSerialManager(truckId);
+        if (!mgr) {
           return res.status(500).json({ success: false, error: 'Serial manager no inicializado' });
         }
-        const success = await this.serialManager.disconnect();
-        res.json({ success, connected: false });
+        const success = await mgr.disconnect();
+        res.json({ success, truckId, connected: false });
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }

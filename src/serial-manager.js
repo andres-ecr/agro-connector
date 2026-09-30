@@ -4,21 +4,22 @@ const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const { EventEmitter } = require('events');
 
-function getConfigFilePath() {
+function getConfigFilePath(channelId = 'truck-1') {
   try {
     const { app } = require('electron');
     if (app && app.getPath) {
-      return path.join(app.getPath('userData'), 'serial-config.json');
+      return path.join(app.getPath('userData'), `serial-config-${channelId}.json`);
     }
   } catch (e) {
     // ignore
   }
-  return path.join(process.cwd(), 'serial-config.json');
+  return path.join(process.cwd(), `serial-config-${channelId}.json`);
 }
 
 class SerialManager extends EventEmitter {
-  constructor() {
+  constructor(channelId = 'truck-1') {
     super();
+    this.channelId = channelId;
     this.port = null;
     this.parser = null;
     this.availablePorts = [];
@@ -35,6 +36,9 @@ class SerialManager extends EventEmitter {
       dataBits: 8,
       stopBits: 1,
       parity: 'none',
+      rtscts: false,
+      xon: false,
+      xoff: false,
       autoOpen: false,
     };
 
@@ -46,16 +50,16 @@ class SerialManager extends EventEmitter {
    */
   loadConfig() {
     try {
-      const cfgPath = getConfigFilePath();
+      const cfgPath = getConfigFilePath(this.channelId);
       if (fs.existsSync(cfgPath)) {
         const raw = fs.readFileSync(cfgPath, 'utf8');
         const parsed = JSON.parse(raw);
         if (parsed.lastPort) this.savedPort = parsed.lastPort;
         if (parsed.baudRate) this.connectionSettings.baudRate = parsed.baudRate;
-        console.log(`Loaded serial config: lastPort=${this.savedPort}`);
+        console.log(`[${this.channelId}] Loaded serial config: lastPort=${this.savedPort}`);
       }
     } catch (e) {
-      console.warn('Could not read serial-config.json:', e.message);
+      console.warn(`[${this.channelId}] Could not read serial config:`, e.message);
     }
   }
 
@@ -64,15 +68,18 @@ class SerialManager extends EventEmitter {
    */
   saveConfig() {
     try {
-      const cfgPath = getConfigFilePath();
+      const cfgPath = getConfigFilePath(this.channelId);
       const data = {
+        channelId: this.channelId,
         lastPort: this.savedPort || this.currentPort,
         baudRate: this.connectionSettings.baudRate,
       };
       fs.writeFileSync(cfgPath, JSON.stringify(data, null, 2), 'utf8');
-      console.log(`Saved serial config: lastPort=${data.lastPort}`);
+      console.log(`[${this.channelId}] Saved serial config: lastPort=${data.lastPort}`);
     } catch (e) {
-      console.warn('Could not save serial-config.json:', e.message);
+      console.warn(`[${this.channelId}] Could not save serial config:`, e.message);
+    }
+  }
     }
   }
 
@@ -204,12 +211,43 @@ class SerialManager extends EventEmitter {
         });
       });
 
+      // Hardware strobe: pulse DTR and RTS lines and flush OS buffer to unstick UART chip without physical replug
+      try {
+        await new Promise((resolve) => this.port.set({ dtr: false, rts: false }, () => resolve()));
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        await new Promise((resolve) => this.port.set({ dtr: true, rts: true }, () => resolve()));
+        await new Promise((resolve) => this.port.flush(() => resolve()));
+        console.log(`[${this.channelId}] Hardware DTR/RTS strobe & flush applied to ${portPath}`);
+      } catch (strobeErr) {
+        console.warn(`[${this.channelId}] Control line strobe skipped/failed:`, strobeErr.message);
+      }
+
       return true;
     } catch (error) {
       console.error('Error connecting:', error);
       this.emit('error', `Error connecting: ${error.message}`);
       return false;
     }
+  }
+
+  /**
+   * Send a software reset pulse to unfreeze UART without physical disconnect
+   */
+  async resetHardware() {
+    if (this.port && this.port.isOpen) {
+      try {
+        await new Promise((resolve) => this.port.set({ dtr: false, rts: false }, () => resolve()));
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        await new Promise((resolve) => this.port.set({ dtr: true, rts: true }, () => resolve()));
+        await new Promise((resolve) => this.port.flush(() => resolve()));
+        console.log(`[${this.channelId}] Manual hardware reset strobe executed.`);
+        return true;
+      } catch (err) {
+        console.warn(`[${this.channelId}] Hardware reset failed:`, err.message);
+        return false;
+      }
+    }
+    return false;
   }
 
   /**
@@ -288,6 +326,13 @@ class SerialManager extends EventEmitter {
       }
 
       if (this.port && this.port.isOpen) {
+        try {
+          await new Promise((resolve) => this.port.flush(() => resolve()));
+          await new Promise((resolve) => this.port.set({ dtr: false, rts: false }, () => resolve()));
+        } catch (e) {
+          // ignore
+        }
+
         await new Promise((resolve) => {
           this.port.close(() => {
             this.isConnected = false;

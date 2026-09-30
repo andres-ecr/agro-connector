@@ -31,6 +31,7 @@ const CONFIG = {
 let mainWindow = null;
 let tray = null;
 let serialManager = null;
+let serialManagers = {};
 let httpWeightServer = null;
 let isAppReady = false;
 
@@ -222,65 +223,65 @@ async function initializeApp() {
   try {
     console.log('Initializing Weight Capture Service...');
 
-    // Initialize serial manager (manual connection mode)
-    serialManager = new SerialManager();
-    serialManager.setAutoReconnect(false);
-    // Background auto-scan and auto-connect are disabled - port connection is strictly manual from UI
+    // Initialize dual serial managers: one for truck-1, one for truck-2
+    serialManagers = {
+      'truck-1': new SerialManager('truck-1'),
+      'truck-2': new SerialManager('truck-2'),
+    };
+    serialManager = serialManagers['truck-1']; // Fallback for backwards-compatibility
 
-    // Initialize HTTP weight server
-    httpWeightServer = new HttpWeightServer({ serialManager });
+    // Initialize HTTP weight server with both managers
+    httpWeightServer = new HttpWeightServer({ serialManagers, serialManager });
     await httpWeightServer.start();
 
-    // Connect serial manager to HTTP server
-    serialManager.on('weight', (data) => {
-      if (httpWeightServer) {
-        httpWeightServer.updateWeight('truck-1', data.value);
-        httpWeightServer.updateWeight('truck-2', data.value);
-        httpWeightServer.setConnectionStatus('truck-1', true);
-        httpWeightServer.setConnectionStatus('truck-2', true);
-      }
+    // Wire events for each truck channel independently
+    Object.entries(serialManagers).forEach(([truckId, mgr]) => {
+      mgr.setAutoReconnect(false);
 
-      // Update main window
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('weight-update', data);
-      }
-    });
+      mgr.on('weight', (data) => {
+        if (httpWeightServer) {
+          httpWeightServer.updateWeight(truckId, data.value);
+          httpWeightServer.setConnectionStatus(truckId, true);
+        }
 
-    serialManager.on('connected', (port) => {
-      console.log(`Serial connected: ${port}`);
-      updateTrayMenu();
+        // Update main window
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('weight-update', { ...data, truckId });
+        }
+      });
 
-      // Set connection status for all trucks
-      if (httpWeightServer) {
-        httpWeightServer.setConnectionStatus('truck-1', true);
-        httpWeightServer.setConnectionStatus('truck-2', true);
-      }
+      mgr.on('connected', (port) => {
+        console.log(`[${truckId}] Serial connected: ${port}`);
+        updateTrayMenu();
 
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('serial-status', { connected: true, port });
-      }
-    });
+        if (httpWeightServer) {
+          httpWeightServer.setConnectionStatus(truckId, true);
+        }
 
-    serialManager.on('disconnected', () => {
-      console.log('Serial disconnected');
-      updateTrayMenu();
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('serial-status', { connected: true, port, truckId });
+        }
+      });
 
-      // Set connection status for all trucks
-      if (httpWeightServer) {
-        httpWeightServer.setConnectionStatus('truck-1', false);
-        httpWeightServer.setConnectionStatus('truck-2', false);
-      }
+      mgr.on('disconnected', () => {
+        console.log(`[${truckId}] Serial disconnected`);
+        updateTrayMenu();
 
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('serial-status', { connected: false });
-      }
-    });
+        if (httpWeightServer) {
+          httpWeightServer.setConnectionStatus(truckId, false);
+        }
 
-    serialManager.on('error', (error) => {
-      console.error('Serial error:', error);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('serial-error', error);
-      }
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('serial-status', { connected: false, truckId });
+        }
+      });
+
+      mgr.on('error', (error) => {
+        console.error(`[${truckId}] Serial error:`, error);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('serial-error', { error, truckId });
+        }
+      });
     });
 
     // Create main window
@@ -324,10 +325,10 @@ app.on('window-all-closed', () => {
 app.on('before-quit', async () => {
   app.isQuiting = true;
 
-  // Cleanup
-  if (serialManager) {
-    serialManager.stopAutoScan();
-    await serialManager.disconnect();
+  // Cleanup all serial managers
+  for (const mgr of Object.values(serialManagers)) {
+    mgr.stopAutoScan();
+    await mgr.disconnect();
   }
 
   if (httpWeightServer) {
@@ -336,17 +337,15 @@ app.on('before-quit', async () => {
 });
 
 // Test Weight Handler
-ipcMain.handle('simulate-weight', async (event, weight) => {
+ipcMain.handle('simulate-weight', async (event, weight, truckId = 'truck-1') => {
   if (!httpWeightServer) {
     throw new Error('HTTP weight server not initialized');
   }
 
-  // Send to truck-1 and truck-2
-  httpWeightServer.updateWeight('truck-1', weight, true);
-  httpWeightServer.updateWeight('truck-2', weight, true);
-  console.log(`Manual weight simulated: ${weight}kg`);
+  httpWeightServer.updateWeight(truckId, weight, true);
+  console.log(`Manual weight simulated for ${truckId}: ${weight}kg`);
 
-  return { success: true, weight, truckId: 'truck-1' };
+  return { success: true, weight, truckId };
 });
 
 // Custom Window Control Handlers (Discord style)
@@ -378,13 +377,19 @@ ipcMain.handle('is-window-maximized', () => {
 
 // IPC Handlers
 ipcMain.handle('get-app-status', () => {
+  const channels = {};
+  for (const [id, mgr] of Object.entries(serialManagers)) {
+    channels[id] = {
+      connected: mgr ? mgr.isConnected : false,
+      port: mgr ? mgr.currentPort : null,
+      savedPort: mgr ? mgr.savedPort : null,
+    };
+  }
+
   return {
     isReady: isAppReady,
-    serial: {
-      connected: serialManager ? serialManager.isConnected : false,
-      port: serialManager ? serialManager.currentPort : null,
-      savedPort: serialManager ? serialManager.savedPort : null,
-    },
+    channels,
+    serial: channels['truck-1'] || { connected: false, port: null },
     httpServer: {
       running: httpWeightServer ? true : false,
       port: 8080,
@@ -394,38 +399,54 @@ ipcMain.handle('get-app-status', () => {
 });
 
 ipcMain.handle('list-serial-ports', async () => {
-  if (!serialManager)
+  const primaryMgr = serialManagers['truck-1'] || serialManager;
+  if (!primaryMgr)
     return { success: false, error: 'Serial manager not initialized' };
 
   try {
-    const ports = await serialManager.listPorts();
+    const ports = await primaryMgr.listPorts();
     return { success: true, ports };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle('connect-serial-port', async (event, portPath) => {
-  if (!serialManager)
-    return { success: false, error: 'Serial manager not initialized' };
+ipcMain.handle('connect-serial-port', async (event, portPath, truckId = 'truck-1') => {
+  const mgr = serialManagers[truckId] || serialManager;
+  if (!mgr)
+    return { success: false, error: `Serial manager para ${truckId} no inicializado` };
 
   try {
-    const result = await serialManager.connect(portPath);
+    const result = await mgr.connect(portPath);
     updateTrayMenu();
-    return { success: result };
+    return { success: result, truckId, port: portPath };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle('disconnect-serial-port', async () => {
-  if (!serialManager)
-    return { success: false, error: 'Serial manager not initialized' };
+ipcMain.handle('disconnect-serial-port', async (event, truckId = 'truck-1') => {
+  const mgr = serialManagers[truckId] || serialManager;
+  if (!mgr)
+    return { success: false, error: `Serial manager para ${truckId} no inicializado` };
 
   try {
-    const result = await serialManager.disconnect();
+    const result = await mgr.disconnect();
     updateTrayMenu();
-    return { success: result };
+    return { success: result, truckId };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('reset-serial-hardware', async (event, truckId = 'truck-1') => {
+  const mgr = serialManagers[truckId] || serialManager;
+  if (!mgr)
+    return { success: false, error: `Serial manager para ${truckId} no inicializado` };
+
+  try {
+    const result = await mgr.resetHardware();
+    return { success: result, truckId };
   } catch (error) {
     return { success: false, error: error.message };
   }
