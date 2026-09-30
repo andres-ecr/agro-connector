@@ -361,6 +361,44 @@
         text-decoration: underline;
       }
 
+      /* Operator Channel Tabs */
+      .channel-tabs {
+        display: flex;
+        gap: 0.4rem;
+        margin-bottom: 0.85rem;
+        background: var(--bg-subtle);
+        padding: 3px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border-color);
+      }
+
+      .channel-tab-btn {
+        flex: 1;
+        padding: 0.45rem 0.5rem;
+        font-size: 0.775rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        transition: all 0.15s ease;
+      }
+
+      .channel-tab-btn:hover {
+        color: var(--primary);
+      }
+
+      .channel-tab-btn.active {
+        background: #ffffff;
+        color: var(--primary);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      }
+
       /* Minimal Tabs */
       .support-tabs {
         display: flex;
@@ -652,6 +690,16 @@
       <!-- ==================== 1. VISTA OPERADOR (DEFAULT) ==================== -->
       <section class="view-panel active" id="viewOperator">
         <div class="operator-content">
+          <!-- Selector de Balanza (Camión 1 / Camión 2) -->
+          <div class="channel-tabs">
+            <button class="channel-tab-btn active" id="btnChannelTruck1" type="button">
+              <span>⚖️ Balanza 1 (Camión 1)</span>
+            </button>
+            <button class="channel-tab-btn" id="btnChannelTruck2" type="button">
+              <span>⚖️ Balanza 2 (Camión 2)</span>
+            </button>
+          </div>
+
           <!-- Indicador de Estado Limpio -->
           <div class="status-badge connected" id="serialStatus">
             <span class="status-dot"></span>
@@ -660,7 +708,7 @@
 
           <!-- Display de Peso Hero -->
           <div class="weight-card">
-            <div class="weight-label">Lectura de Balanza</div>
+            <div class="weight-label" id="weightHeroLabel">Lectura Balanza 1 (Camión 1)</div>
             <div class="weight-number" id="weightValue">0.0</div>
             <div class="weight-unit">KG</div>
             <div class="weight-meta" id="weightMeta">Transmitiendo en vivo</div>
@@ -669,7 +717,7 @@
           <!-- Selector de Puerto COM para el Operador -->
           <div class="operator-port-card" style="margin-top: 0.85rem; padding: 0.75rem 1rem; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-sm);">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
-              <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Puerto COM Balanza</span>
+              <span id="opPortCardLabel" style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Puerto COM Balanza 1 (Camión 1)</span>
               <button class="btn btn-outline btn-sm" id="opRefreshPortsBtn" type="button" title="Refrescar puertos" style="padding: 0.15rem 0.45rem; font-size: 0.7rem; border-radius: 4px;">
                 ↻ Buscar
               </button>

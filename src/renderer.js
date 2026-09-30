@@ -6,6 +6,22 @@
 const { ipcRenderer } = require('electron');
 
 // Global state
+let activeChannel = 'truck-1'; // 'truck-1' | 'truck-2'
+let channels = {
+  'truck-1': {
+    weight: 0,
+    connected: false,
+    port: null,
+    savedPort: localStorage.getItem('sobifruits_saved_port_truck-1') || localStorage.getItem('sobifruits_saved_port') || null,
+  },
+  'truck-2': {
+    weight: 0,
+    connected: false,
+    port: null,
+    savedPort: localStorage.getItem('sobifruits_saved_port_truck-2') || null,
+  },
+};
+let detectedPorts = [];
 let currentWeight = 0;
 let serialConnected = false;
 let currentPortPath = null;
@@ -13,6 +29,8 @@ let currentMode = 'operator'; // 'operator' | 'support'
 let logEntries = [];
 
 // DOM Elements
+let btnChannelTruck1, btnChannelTruck2;
+let opPortCardLabel, weightHeroLabel;
 let weightValueEl, weightMetaEl;
 let serialStatusEl, serialStatusTextEl;
 let httpServerStatusEl, httpStatusTextEl;
@@ -49,6 +67,12 @@ document.addEventListener('DOMContentLoaded', async () => {
  * Initialize DOM element references
  */
 function initializeElements() {
+  // Channel Tabs & Dynamic Labels
+  btnChannelTruck1 = document.getElementById('btnChannelTruck1');
+  btnChannelTruck2 = document.getElementById('btnChannelTruck2');
+  opPortCardLabel = document.getElementById('opPortCardLabel');
+  weightHeroLabel = document.getElementById('weightHeroLabel');
+
   // Hero Weight
   weightValueEl = document.getElementById('weightValue');
   weightMetaEl = document.getElementById('weightMeta');
@@ -166,16 +190,31 @@ function setupEventListeners() {
     }
   });
 
+  // Channel Tabs (Balanza 1 / Balanza 2)
+  if (btnChannelTruck1) {
+    btnChannelTruck1.addEventListener('click', () => switchChannel('truck-1'));
+  }
+  if (btnChannelTruck2) {
+    btnChannelTruck2.addEventListener('click', () => switchChannel('truck-2'));
+  }
+
   // Sync operator port selector change
   if (opSerialPortSelect) {
     opSerialPortSelect.addEventListener('change', () => {
       const val = opSerialPortSelect.value;
       if (serialPortSelect) serialPortSelect.value = val;
+      if (channels[activeChannel]) {
+        channels[activeChannel].savedPort = val || null;
+      }
+      const isConnected = channels[activeChannel]?.connected || false;
       const hasPort = Boolean(val);
-      if (opConnectBtn) opConnectBtn.disabled = !hasPort || serialConnected;
-      if (connectBtn) connectBtn.disabled = !hasPort || serialConnected;
+      if (opConnectBtn) opConnectBtn.disabled = !hasPort || isConnected;
+      if (connectBtn) connectBtn.disabled = !hasPort || isConnected;
       if (hasPort) {
-        localStorage.setItem('sobifruits_saved_port', val);
+        localStorage.setItem(`sobifruits_saved_port_${activeChannel}`, val);
+        if (activeChannel === 'truck-1') {
+          localStorage.setItem('sobifruits_saved_port', val);
+        }
       }
     });
   }
@@ -185,11 +224,18 @@ function setupEventListeners() {
     serialPortSelect.addEventListener('change', () => {
       const val = serialPortSelect.value;
       if (opSerialPortSelect) opSerialPortSelect.value = val;
+      if (channels[activeChannel]) {
+        channels[activeChannel].savedPort = val || null;
+      }
+      const isConnected = channels[activeChannel]?.connected || false;
       const hasPort = Boolean(val);
-      if (opConnectBtn) opConnectBtn.disabled = !hasPort || serialConnected;
-      if (connectBtn) connectBtn.disabled = !hasPort || serialConnected;
+      if (opConnectBtn) opConnectBtn.disabled = !hasPort || isConnected;
+      if (connectBtn) connectBtn.disabled = !hasPort || isConnected;
       if (hasPort) {
-        localStorage.setItem('sobifruits_saved_port', val);
+        localStorage.setItem(`sobifruits_saved_port_${activeChannel}`, val);
+        if (activeChannel === 'truck-1') {
+          localStorage.setItem('sobifruits_saved_port', val);
+        }
       }
     });
   }
@@ -215,8 +261,9 @@ function setupEventListeners() {
 
       try {
         sendTestWeightBtn.disabled = true;
-        await ipcRenderer.invoke('simulate-weight', weight);
-        addLogEntry('success', `Simulación emitida: ${weight.toFixed(1)} kg`);
+        await ipcRenderer.invoke('simulate-weight', weight, activeChannel);
+        const balLabel = activeChannel === 'truck-1' ? 'Balanza 1 (Camión 1)' : 'Balanza 2 (Camión 2)';
+        addLogEntry('success', `Simulación emitida para ${balLabel}: ${weight.toFixed(1)} kg`);
       } catch (err) {
         addLogEntry('error', `Error al emitir peso simulado: ${err.message}`);
       } finally {
@@ -326,6 +373,31 @@ function switchToOperatorMode() {
   viewOperator.classList.add('active');
 }
 
+/**
+ * Switch active scale channel (truck-1 vs truck-2)
+ */
+function switchChannel(channelId) {
+  if (activeChannel === channelId) return;
+  activeChannel = channelId;
+
+  if (btnChannelTruck1) {
+    btnChannelTruck1.classList.toggle('active', activeChannel === 'truck-1');
+  }
+  if (btnChannelTruck2) {
+    btnChannelTruck2.classList.toggle('active', activeChannel === 'truck-2');
+  }
+
+  const label = activeChannel === 'truck-1' ? 'Balanza 1 (Camión 1)' : 'Balanza 2 (Camión 2)';
+  if (weightHeroLabel) {
+    weightHeroLabel.textContent = `Lectura ${label}`;
+  }
+  if (opPortCardLabel) {
+    opPortCardLabel.textContent = `Puerto COM ${label}`;
+  }
+
+  renderActiveChannel();
+}
+
 function handleSaveNewPin() {
   const p1 = newPinInput.value.trim();
   const p2 = confirmPinInput.value.trim();
@@ -401,46 +473,56 @@ function startPeriodicUpdates() {
  * Update weight reading
  */
 function updateWeight(data) {
-  currentWeight = data.value;
-  if (weightValueEl) {
-    weightValueEl.textContent = Number(data.value).toFixed(1);
+  const truckId = data.truckId || 'truck-1';
+  if (channels[truckId]) {
+    channels[truckId].weight = data.value;
+    channels[truckId].timestamp = data.timestamp;
   }
 
-  const timestamp = new Date(data.timestamp || Date.now()).toLocaleTimeString();
-  if (weightMetaEl) {
-    weightMetaEl.textContent = `Última lectura: ${timestamp} • En vivo`;
+  if (truckId === activeChannel) {
+    currentWeight = data.value;
+    if (weightValueEl) {
+      weightValueEl.textContent = Number(data.value).toFixed(1);
+    }
+
+    const timestamp = new Date(data.timestamp || Date.now()).toLocaleTimeString();
+    if (weightMetaEl) {
+      weightMetaEl.textContent = `Última lectura: ${timestamp} • En vivo`;
+    }
   }
 }
 
 /**
- * Update serial status
+ * Render UI for currently active channel
  */
-function updateSerialStatus(status) {
-  serialConnected = status.connected;
-  currentPortPath = status.port || null;
+function renderActiveChannel() {
+  const ch = channels[activeChannel] || { weight: 0, connected: false, port: null };
+  const channelName = activeChannel === 'truck-1' ? 'Balanza 1 (Camión 1)' : 'Balanza 2 (Camión 2)';
 
-  if (serialConnected) {
+  // 1. Update Weight
+  if (weightValueEl) {
+    weightValueEl.textContent = Number(ch.weight || 0).toFixed(1);
+  }
+
+  // 2. Update Status badge & Connection buttons
+  if (ch.connected) {
     if (serialStatusEl) serialStatusEl.className = 'status-badge connected';
     if (serialStatusTextEl) {
-      serialStatusTextEl.textContent = currentPortPath ? `Balanza Conectada (${currentPortPath})` : 'Balanza Conectada';
-    }
-
-    // Keep dropdown selectors synchronized with the active connected port
-    if (currentPortPath) {
-      if (serialPortSelect) serialPortSelect.value = currentPortPath;
-      if (opSerialPortSelect) opSerialPortSelect.value = currentPortPath;
+      serialStatusTextEl.textContent = ch.port ? `${channelName} Conectada (${ch.port})` : `${channelName} Conectada`;
     }
 
     if (connectBtn) connectBtn.style.display = 'none';
     if (disconnectBtn) {
       disconnectBtn.style.display = 'inline-flex';
       disconnectBtn.disabled = false;
+      disconnectBtn.innerHTML = '<span>Desconectar</span>';
     }
 
     if (opConnectBtn) opConnectBtn.style.display = 'none';
     if (opDisconnectBtn) {
       opDisconnectBtn.style.display = 'inline-flex';
       opDisconnectBtn.disabled = false;
+      opDisconnectBtn.innerHTML = '<span>Desconectar</span>';
     }
 
     if (weightMetaEl) {
@@ -448,25 +530,85 @@ function updateSerialStatus(status) {
     }
   } else {
     if (serialStatusEl) serialStatusEl.className = 'status-badge disconnected';
-    if (serialStatusTextEl) serialStatusTextEl.textContent = 'Balanza Desconectada';
+    if (serialStatusTextEl) {
+      serialStatusTextEl.textContent = `${channelName} Desconectada`;
+    }
 
     if (disconnectBtn) disconnectBtn.style.display = 'none';
     if (connectBtn) {
       connectBtn.style.display = 'inline-flex';
-      connectBtn.disabled = !serialPortSelect || !serialPortSelect.value;
-      connectBtn.innerHTML = 'Conectar Balanza';
+      connectBtn.disabled = !opSerialPortSelect || !opSerialPortSelect.value;
+      connectBtn.innerHTML = `<span>Conectar ${channelName}</span>`;
     }
 
     if (opDisconnectBtn) opDisconnectBtn.style.display = 'none';
     if (opConnectBtn) {
       opConnectBtn.style.display = 'inline-flex';
       opConnectBtn.disabled = !opSerialPortSelect || !opSerialPortSelect.value;
-      opConnectBtn.innerHTML = 'Conectar';
+      opConnectBtn.innerHTML = '<span>Conectar</span>';
     }
 
     if (weightMetaEl) {
       weightMetaEl.textContent = 'Seleccione el puerto COM y presione Conectar';
     }
+  }
+
+  // 3. Sync Dropdown Selection for active channel
+  syncPortDropdownForActiveChannel();
+}
+
+/**
+ * Sync dropdown selection for active channel
+ */
+function syncPortDropdownForActiveChannel() {
+  const selects = [serialPortSelect, opSerialPortSelect].filter(Boolean);
+  if (selects.length === 0 || detectedPorts.length === 0) return;
+
+  const ch = channels[activeChannel];
+  let targetPort = null;
+
+  if (ch && ch.connected && ch.port && detectedPorts.some((p) => p.path === ch.port)) {
+    targetPort = ch.port;
+  } else if (ch && ch.savedPort && detectedPorts.some((p) => p.path === ch.savedPort)) {
+    targetPort = ch.savedPort;
+  } else {
+    const usbPorts = detectedPorts.filter((p) => p.isUsb);
+    if (activeChannel === 'truck-2' && usbPorts.length > 1) {
+      targetPort = usbPorts[1].path;
+    } else if (usbPorts.length > 0) {
+      targetPort = usbPorts[0].path;
+    } else if (detectedPorts.length > 0) {
+      targetPort = detectedPorts[0].path;
+    }
+  }
+
+  if (targetPort) {
+    selects.forEach((s) => {
+      s.value = targetPort;
+    });
+  }
+
+  if (ch && !ch.connected) {
+    if (connectBtn) connectBtn.disabled = !targetPort;
+    if (opConnectBtn) opConnectBtn.disabled = !targetPort;
+  }
+}
+
+/**
+ * Update serial status
+ */
+function updateSerialStatus(status) {
+  const truckId = status.truckId || 'truck-1';
+  if (channels[truckId]) {
+    channels[truckId].connected = Boolean(status.connected);
+    channels[truckId].port = status.port || null;
+    if (status.port) {
+      channels[truckId].savedPort = status.port;
+    }
+  }
+
+  if (truckId === activeChannel) {
+    renderActiveChannel();
   }
 }
 
@@ -474,9 +616,22 @@ function updateSerialStatus(status) {
  * Update overall app status
  */
 function updateAppStatus(status) {
-  if (status.serial) {
-    updateSerialStatus(status.serial);
+  if (status.channels) {
+    for (const [id, ch] of Object.entries(status.channels)) {
+      if (channels[id]) {
+        channels[id].connected = Boolean(ch.connected);
+        channels[id].port = ch.port || null;
+        if (ch.savedPort) {
+          channels[id].savedPort = ch.savedPort;
+        }
+      }
+    }
+  } else if (status.serial && channels['truck-1']) {
+    channels['truck-1'].connected = Boolean(status.serial.connected);
+    channels['truck-1'].port = status.serial.port || null;
   }
+
+  renderActiveChannel();
 
   if (status.httpServer) {
     const isRunning = status.httpServer.running;
@@ -522,38 +677,28 @@ async function connectToSerial(explicitPort) {
     opConnectBtn.innerHTML = `<span>Conectando...</span>`;
   }
 
+  const channelName = activeChannel === 'truck-1' ? 'Balanza 1' : 'Balanza 2';
   try {
-    const result = await ipcRenderer.invoke('connect-serial-port', selectedPort);
+    const result = await ipcRenderer.invoke('connect-serial-port', selectedPort, activeChannel);
     if (result.success) {
-      addLogEntry('success', `Conectado al puerto ${selectedPort}`);
-      localStorage.setItem('sobifruits_saved_port', selectedPort);
+      addLogEntry('success', `[${channelName}] Conectado al puerto ${selectedPort}`);
+      if (channels[activeChannel]) {
+        channels[activeChannel].connected = true;
+        channels[activeChannel].port = selectedPort;
+        channels[activeChannel].savedPort = selectedPort;
+      }
+      localStorage.setItem(`sobifruits_saved_port_${activeChannel}`, selectedPort);
+      if (activeChannel === 'truck-1') {
+        localStorage.setItem('sobifruits_saved_port', selectedPort);
+      }
+      renderActiveChannel();
     } else {
-      addLogEntry('error', `Fallo de conexión en ${selectedPort}: ${result.error}`);
-      if (localStorage.getItem('sobifruits_saved_port') === selectedPort) {
-        localStorage.removeItem('sobifruits_saved_port');
-      }
-      if (connectBtn) {
-        connectBtn.disabled = false;
-        connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
-      }
-      if (opConnectBtn) {
-        opConnectBtn.disabled = false;
-        opConnectBtn.innerHTML = `<span>Conectar</span>`;
-      }
+      addLogEntry('error', `[${channelName}] Fallo de conexión en ${selectedPort}: ${result.error}`);
+      renderActiveChannel();
     }
   } catch (err) {
     addLogEntry('error', `Error al conectar: ${err.message}`);
-    if (localStorage.getItem('sobifruits_saved_port') === selectedPort) {
-      localStorage.removeItem('sobifruits_saved_port');
-    }
-    if (connectBtn) {
-      connectBtn.disabled = false;
-      connectBtn.innerHTML = `<span>Conectar Balanza</span>`;
-    }
-    if (opConnectBtn) {
-      opConnectBtn.disabled = false;
-      opConnectBtn.innerHTML = `<span>Conectar</span>`;
-    }
+    renderActiveChannel();
   }
 }
 
@@ -567,15 +712,23 @@ async function disconnectFromSerial() {
     opDisconnectBtn.innerHTML = `<span>Desconectando...</span>`;
   }
 
+  const channelName = activeChannel === 'truck-1' ? 'Balanza 1' : 'Balanza 2';
   try {
-    const result = await ipcRenderer.invoke('disconnect-serial-port');
+    const result = await ipcRenderer.invoke('disconnect-serial-port', activeChannel);
     if (result.success) {
-      addLogEntry('info', 'Balanza desconectada.');
+      addLogEntry('info', `[${channelName}] Balanza desconectada.`);
+      if (channels[activeChannel]) {
+        channels[activeChannel].connected = false;
+        channels[activeChannel].port = null;
+      }
+      renderActiveChannel();
     } else {
-      addLogEntry('error', `Error al desconectar: ${result.error}`);
+      addLogEntry('error', `[${channelName}] Error al desconectar: ${result.error}`);
+      renderActiveChannel();
     }
   } catch (err) {
     addLogEntry('error', `Error: ${err.message}`);
+    renderActiveChannel();
   } finally {
     if (disconnectBtn) {
       disconnectBtn.disabled = false;
@@ -624,6 +777,8 @@ function populateSerialPorts(ports) {
     return numA - numB;
   });
 
+  detectedPorts = cleanPorts;
+
   selects.forEach((select) => {
     select.innerHTML = '<option value="">Seleccione un puerto...</option>';
     cleanPorts.forEach((port) => {
@@ -638,31 +793,7 @@ function populateSerialPorts(ports) {
     });
   });
 
-  const savedPort = localStorage.getItem('sobifruits_saved_port');
-  let chosenPort = null;
-
-  if (serialConnected && currentPortPath && cleanPorts.some((p) => p.path === currentPortPath)) {
-    chosenPort = currentPortPath;
-  } else if (savedPort && cleanPorts.some((p) => p.path === savedPort && p.isValid !== false)) {
-    chosenPort = savedPort;
-  } else {
-    const validUsb = cleanPorts.find((p) => p.isUsb && p.isValid !== false);
-    const validAny = cleanPorts.find((p) => p.isValid !== false);
-    chosenPort = (validUsb || validAny)?.path || (cleanPorts.length > 0 ? cleanPorts[0].path : null);
-  }
-
-  if (chosenPort) {
-    selects.forEach((select) => {
-      select.value = chosenPort;
-    });
-  }
-
-  if (connectBtn) {
-    connectBtn.disabled = !chosenPort || serialConnected;
-  }
-  if (opConnectBtn) {
-    opConnectBtn.disabled = !chosenPort || serialConnected;
-  }
+  syncPortDropdownForActiveChannel();
 }
 
 /**
