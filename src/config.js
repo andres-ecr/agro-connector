@@ -54,7 +54,7 @@ const config = {
   // Application Configuration
   app: {
     name: 'Weight Capture Service',
-    version: '1.0.0',
+    version: '1.0.2',
     description: 'Lightweight Electron app that bridges weight scale data to web applications',
     
     // Window configuration
